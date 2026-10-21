@@ -69,6 +69,8 @@ curl http://localhost:4141/v1/models
 
 From here, jump to the guide for your client: [Claude Code](docs/guides/en/claude-code.md#using-with-claude-code), [OpenCode](docs/guides/en/opencode.md#using-with-opencode), [Codex](docs/guides/en/codex.md#using-with-codex), [DeepSeek Harness](docs/guides/en/dsh.md#using-with-deepseek-harness), or run it with [Docker](docs/guides/en/docker.md#using-with-docker).
 
+For the Linux/WSL deployment that reuses an existing Copilot CLI login through `gh`, see [local deployment files](deploy/local/README.md).
+
 ## Compatibility
 
 Every client talks to the same local endpoint. The gateway routes each request to GitHub Copilot, the built-in `codex` or `xai` provider, or a configured third-party provider, translating between protocols when the provider speaks a different one.

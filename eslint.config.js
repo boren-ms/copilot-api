@@ -55,4 +55,9 @@ export default defineConfig(
       "unused-imports/no-unused-imports": "error",
     },
   },
+  {
+    files: ["deploy/local/*.mjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { parserOptions: { projectService: false } },
+  },
 )

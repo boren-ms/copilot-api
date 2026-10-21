@@ -1,0 +1,22 @@
+model_provider = "copilot-api-community"
+model = "copilot-cli/gpt-6.1-sol"
+model_reasoning_effort = "medium"
+web_search = "disabled"
+
+[model_providers.copilot-api-community]
+name = "OpenAI"
+base_url = "http://127.0.0.1:4141"
+model_catalog_url = "http://127.0.0.1:4141/models"
+wire_api = "responses"
+supports_websockets = false
+request_max_retries = 2
+stream_max_retries = 2
+stream_idle_timeout_ms = 300000
+
+[model_providers.copilot-api-community.auth]
+command = "/usr/bin/cat"
+args = ["/home/boren/.local/share/copilot-api/gateway_key"]
+
+[features]
+fast_mode = false
+ultrafast_mode = false

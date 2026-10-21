@@ -1,0 +1,21 @@
+[Unit]
+Description=Copilot API gateway using existing GitHub CLI authentication
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=%h/code/copilot-api
+Environment=NODE_ENV=production
+Environment=COPILOT_API_HOME=%h/.local/share/copilot-api
+ExecStartPre=/usr/bin/node %h/code/copilot-api/deploy/local/prepare-gh-auth.mjs
+ExecStart=/usr/bin/node %h/code/copilot-api/dist/main.js start --host 127.0.0.1 --port 4141
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=20
+UMask=0077
+
+[Install]
+WantedBy=default.target
