@@ -4,18 +4,16 @@ model_reasoning_effort = "medium"
 web_search = "disabled"
 
 [model_providers.copilot-api-community]
-name = "OpenAI"
+name = "Copilot API"
 base_url = "http://127.0.0.1:4141"
 model_catalog_url = "http://127.0.0.1:4141/models"
 wire_api = "responses"
+requires_openai_auth = true
+env_http_headers = { "x-api-key" = "COPILOT_API_GATEWAY_KEY" }
 supports_websockets = false
 request_max_retries = 2
 stream_max_retries = 2
 stream_idle_timeout_ms = 300000
-
-[model_providers.copilot-api-community.auth]
-command = "/usr/bin/cat"
-args = ["/home/boren/.local/share/copilot-api/gateway_key"]
 
 [features]
 fast_mode = false

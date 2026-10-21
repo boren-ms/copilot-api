@@ -52,6 +52,19 @@ describe("request auth middleware", () => {
     expect(await response.json()).toEqual({ ok: true, scope: "default" })
   })
 
+  test("accepts a gateway key alongside independent ChatGPT authentication", async () => {
+    const app = createApp()
+    const response = await app.request("/models", {
+      headers: {
+        "x-api-key": "regular-key",
+        authorization: "Bearer independent-chatgpt-credential",
+      },
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, scope: "default" })
+  })
+
   test("accepts admin api key for admin routes", async () => {
     const app = createApp()
     const response = await app.request("/admin/config/model-mappings", {

@@ -6,6 +6,15 @@
 
 This AI gateway can also power Codex.
 
+### Local desktop setup and mobile Remote Control
+
+For the Windows Codex desktop app with a WSL backend, run `bun run setup:codex`
+from the repository root after configuring the local gateway and its key file.
+The installer updates the active device configuration, preserves other settings,
+and installs the launch environment helper. Use `--cli` for the Linux/WSL CLI.
+See [local setup](../../../deploy/local/README.md) for prerequisites, options,
+backups, service status commands, and ChatGPT sign-in / QR pairing steps.
+
 Recommended Codex version: `0.160.0` or newer. These clients can load the model catalog from `model_catalog_url`, so the local `model_catalog_json` file is optional.
 
 Remote catalog responses are limited to 1 MiB of JSON. When the merged catalog is larger, the gateway keeps models selected through provider `agentsModels` first and drops the rest. Select the models you need on the Providers page, or generate a local catalog for the complete list.
@@ -37,11 +46,11 @@ service_tier = "default"
 # model_catalog_json = "model_catalog.json"
 
 [model_providers.copilot_api]
-name = "OpenAI"
+name = "Copilot API"
 base_url = "http://localhost:4141"
 model_catalog_url = "http://localhost:4141/models"
-env_key = "GITHUB_COPILOT_API_KEY"
 requires_openai_auth = true
+env_http_headers = { "x-api-key" = "GITHUB_COPILOT_API_KEY" }
 supports_websockets = false
 supports_standalone_web_search = true
 wire_api = "responses"
@@ -68,15 +77,15 @@ enabled = false
 ```
 
 > [!NOTE]
-> `name` must be set to `"OpenAI"`.
+> `name` is the provider display name. `"Copilot API"` was verified with the desktop WSL runtime `0.163.0-alpha.11`.
 >
 > **Mailbox Preemption:** Set `defer_mailbox_preemption = true` under `[features]` to defer sub-agent message preemption. By default, receiving a sub-agent message may cause the main agent to stop reading the SSE stream after a complete reasoning/commentary output item and start the next model request without waiting for `response.completed`.
 >
 > When enabled, receiving a sub-agent message no longer ends the current model response early. Messages are delivered at the next normal input-processing point, reducing brief overlaps where a new request starts before the previous one finishes. If you encounter `Encrypted function output content could not be decrypted or decoded` when using Codex with GitHub Copilot, try enabling this option.
 >
-> Sign in to Codex with ChatGPT or an API key before use. `requires_openai_auth = true` shows account information in the UI, plus quota usage and subscription details for ChatGPT sign-in; request authentication still prioritizes `env_key`. To bypass account restrictions in the Codex client, try setting it to `false`. Note that `false` also hides Remote (**Control this Mac** under **Settings → Connections**) in the desktop app ([openai/codex#36879](https://github.com/openai/codex/issues/36879)).
+> Sign in to Codex with ChatGPT when using mobile Remote Control. `requires_openai_auth = true` enables ChatGPT account authentication; `env_http_headers` supplies the gateway key separately through `x-api-key`. The gateway gives that header precedence over the ChatGPT `Authorization` header. Remove a provider `auth` command, `env_key`, or `experimental_bearer_token` when using this layout. Setting `requires_openai_auth = false` hides Remote in the desktop app ([openai/codex#36879](https://github.com/openai/codex/issues/36879)).
 >
-> Set `GITHUB_COPILOT_API_KEY` as a system-level user environment variable so the Codex app can read it too. Use one of the [gateway API keys](cli.md#auth-command-options), or any non-empty placeholder when none are configured; if it is unset, Codex fails with a `Missing environment variable` error.
+> Make `GITHUB_COPILOT_API_KEY` available to the process launching Codex and use one of the [gateway API keys](cli.md#auth-command-options). The local installer uses `COPILOT_API_GATEWAY_KEY` instead and reads it from a protected key file at launch. In WSL desktop mode the backend uses a Bash login shell, so a variable set only in `.zshrc` will not reach it.
 
 ### Auto Review Model Mapping
 

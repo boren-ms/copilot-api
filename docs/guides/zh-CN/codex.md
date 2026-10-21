@@ -8,6 +8,13 @@
 
 这个 AI gateway 也可以为 Codex 提供后端能力。
 
+### 本地桌面配置与手机远程控制
+
+Windows Codex 桌面应用使用 WSL 后端时，先配置本地网关和密钥文件，再在仓库根目录执行
+`bun run setup:codex`。安装程序会更新当前设备的配置、保留其他设置，并安装启动环境加载脚本。
+Linux/WSL CLI 使用 `--cli`。前置条件、可选参数、备份、服务状态命令以及 ChatGPT 登录和二维码配对步骤，
+请参阅[本地安装说明](../../../deploy/local/README.md)。
+
 推荐使用 Codex `0.160.0` 或更高版本：这些客户端会从 `model_catalog_url` 加载模型目录，因此本地 `model_catalog_json` 文件是可选的。
 
 远程目录响应限制为 1 MiB JSON。合并后的目录超出该限制时，网关会优先保留通过 provider `agentsModels` 选中的模型，其余模型会被丢弃。请在 Provider 管理页选择需要的模型；如果需要完整列表，则生成本地目录文件。
@@ -39,11 +46,11 @@ service_tier = "default"
 # model_catalog_json = "model_catalog.json"
 
 [model_providers.copilot_api]
-name = "OpenAI"
+name = "Copilot API"
 base_url = "http://localhost:4141"
 model_catalog_url = "http://localhost:4141/models"
-env_key = "GITHUB_COPILOT_API_KEY"
 requires_openai_auth = true
+env_http_headers = { "x-api-key" = "GITHUB_COPILOT_API_KEY" }
 supports_websockets = false
 supports_standalone_web_search = true
 wire_api = "responses"
@@ -70,15 +77,15 @@ enabled = false
 ```
 
 > [!NOTE]
-> `name` 一定要配置为 `"OpenAI"`。
+> `name` 是 provider 的显示名称。`"Copilot API"` 已在桌面应用 WSL runtime `0.163.0-alpha.11` 中验证。
 >
 > **延迟子 Agent 消息抢占（Mailbox Preemption）：** 在 `[features]` 中设置 `defer_mailbox_preemption = true`。默认情况下，主 Agent 收到子 Agent 消息后，可能在当前模型输出 reasoning/commentary 等完整输出项时提前结束 SSE 读取，无需等待 `response.completed`，就发起下一次模型请求。
 >
 > 开启后，不再因收到子 Agent 消息而提前结束当前模型响应；消息将在正常的下一次输入处理时机交付，可减少旧请求尚未结束、新请求就已启动的短暂并发。通过 GitHub Copilot 使用 Codex 时，若遇到 `Encrypted function output content could not be decrypted or decoded` 异常，可尝试开启此项。
 >
-> 使用 Codex 需先通过 ChatGPT 或 API Key 登录。`requires_openai_auth = true` 用于在 UI 中显示登录账号信息，ChatGPT 登录时还可显示额度和订阅信息；请求鉴权仍优先使用 `env_key`。如需绕过 Codex 客户端的账号限制，可尝试设为 `false`。注意：设为 `false` 后，桌面应用会隐藏 Remote（**Settings → Connections** 中的 **Control this Mac**）（[openai/codex#36879](https://github.com/openai/codex/issues/36879)）。
+> 使用手机远程控制时，需在 Codex 中登录 ChatGPT。`requires_openai_auth = true` 启用 ChatGPT 账号鉴权，`env_http_headers` 通过 `x-api-key` 单独传递网关密钥。网关优先使用该 header，而不是 ChatGPT 的 `Authorization` header。使用此配置时，移除 provider 下的 `auth` 命令、`env_key` 或 `experimental_bearer_token`。设为 `false` 后，桌面应用会隐藏 Remote（[openai/codex#36879](https://github.com/openai/codex/issues/36879)）。
 >
-> `GITHUB_COPILOT_API_KEY` 需设置为系统级用户环境变量，以便 Codex 应用也能读取。填写任一[网关 API Key](cli.md#auth-命令选项)；未配置 Key 时，填写任意非空占位值即可。未设置时，Codex 会报 `Missing environment variable` 错误。
+> 启动 Codex 的进程需要能读取 `GITHUB_COPILOT_API_KEY`，其值为任一[网关 API Key](cli.md#auth-命令选项)。本地安装程序改用 `COPILOT_API_GATEWAY_KEY`，在启动时读取受保护的密钥文件。桌面应用的 WSL 后端使用 Bash 登录 shell，仅在 `.zshrc` 中设置变量不会生效。
 
 ### 自动审核模型映射
 

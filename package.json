@@ -38,6 +38,7 @@
     "prepack": "bun run build",
     "prepare": "simple-git-hooks",
     "release": "bumpp && bun publish --access public",
+    "setup:codex": "bun deploy/local/setup-codex.mjs",
     "start": "NODE_USE_SYSTEM_CA=1 NODE_ENV=production bun run ./src/main.ts",
     "typecheck": "tsc",
     "typecheck:all": "bun run typecheck && bun run --cwd desktop typecheck",

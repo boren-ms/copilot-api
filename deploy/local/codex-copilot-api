@@ -1,10 +1,19 @@
 #!/bin/sh
 set -eu
-export CODEX_HOME="$HOME/.codex"
+export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 
-if ! curl --noproxy '*' --fail --silent --max-time 3 http://127.0.0.1:4141/ >/dev/null; then
+if [ ! -r "$HOME/.config/copilot-api/codex-env.sh" ]; then
+    printf '%s\n' 'Copilot API setup is missing. Run bun run setup:codex --cli from the repository.' >&2
+    exit 1
+fi
+
+. "$HOME/.config/copilot-api/codex-env.sh"
+copilot_api_load_gateway_key
+
+gateway_url="${COPILOT_API_BASE_URL:-http://127.0.0.1:4141}"
+if ! curl --noproxy '*' --fail --silent --max-time 3 "${gateway_url%/}/" >/dev/null; then
     printf '%s\n' 'Copilot API is unavailable. Run: systemctl --user start copilot-api.service' >&2
     exit 1
 fi
 
-exec "$HOME/.local/bin/codex" --profile copilot-api-community "$@"
+exec codex "$@"
