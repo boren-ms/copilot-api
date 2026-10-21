@@ -1,9 +1,9 @@
 /**
- * Stream ID Synchronization for @ai-sdk/openai compatibility
+ * Stream ID Synchronization for Responses API clients
  *
  * Problem: GitHub Copilot's Responses API returns different IDs for the same
- * item in 'added' vs 'done' events. This breaks @ai-sdk/openai which expects
- * consistent IDs across the stream lifecycle.
+ * item across stream events and terminal response output. Clients such as
+ * Codex desktop and @ai-sdk/openai require one ID for the entire item lifecycle.
  *
  * Errors without this fix:
  * - "activeReasoningPart.summaryParts" undefined
@@ -13,9 +13,13 @@
  * via @ai-sdk/openai provider requires the Responses API endpoint.
  */
 
+import { randomUUID } from "node:crypto"
+
 import type {
   ResponseOutputItemAddedEvent,
   ResponseOutputItemDoneEvent,
+  ResponseOutputItem,
+  ResponsesResult,
   ResponseStreamEvent,
 } from "~/lib/types/responses"
 
@@ -32,66 +36,78 @@ export const fixStreamIds = (
   event: string | undefined,
   tracker: StreamIdTracker,
 ): string => {
-  if (!data) return data
-  const parsed = JSON.parse(data) as ResponseStreamEvent
-  switch (event) {
-    case "response.output_item.added": {
-      return handleOutputItemAdded(
-        parsed as ResponseOutputItemAddedEvent,
-        tracker,
-      )
-    }
+  if (!data || data === "[DONE]") return data
+  let parsed: ResponseStreamEvent
+  try {
+    parsed = JSON.parse(data) as ResponseStreamEvent
+  } catch {
+    return data
+  }
+  if (!parsed || typeof parsed !== "object") return data
+
+  let changed = false
+  switch (event || parsed.type) {
+    case "response.output_item.added":
     case "response.output_item.done": {
-      return handleOutputItemDone(
-        parsed as ResponseOutputItemDoneEvent,
+      const itemEvent = parsed as
+        | ResponseOutputItemAddedEvent
+        | ResponseOutputItemDoneEvent
+      changed = synchronizeOutputItemId(
+        itemEvent.item,
+        itemEvent.output_index,
         tracker,
       )
+      break
+    }
+    case "response.completed":
+    case "response.incomplete":
+    case "response.failed": {
+      const terminalEvent = parsed as Extract<
+        ResponseStreamEvent,
+        { response: ResponsesResult }
+      >
+      if (!Array.isArray(terminalEvent.response?.output)) break
+      terminalEvent.response.output.forEach((item, outputIndex) => {
+        if (synchronizeOutputItemId(item, outputIndex, tracker)) changed = true
+      })
+      break
     }
     default: {
-      return handleItemId(parsed, tracker)
+      changed = synchronizeItemId(parsed, tracker)
     }
   }
+  return changed ? JSON.stringify(parsed) : data
 }
 
-const handleOutputItemAdded = (
-  parsed: ResponseOutputItemAddedEvent,
+const synchronizeOutputItemId = (
+  item: ResponseOutputItem,
+  outputIndex: number,
   tracker: StreamIdTracker,
-): string => {
-  if (!parsed.item.id) {
-    let randomSuffix = ""
-    while (randomSuffix.length < 16) {
-      randomSuffix += Math.random().toString(36).slice(2)
-    }
-    parsed.item.id = `oi_${parsed.output_index}_${randomSuffix.slice(0, 16)}`
+): boolean => {
+  if (!item || typeof item !== "object" || !Number.isInteger(outputIndex)) {
+    return false
   }
-
-  const outputIndex = parsed.output_index
-  tracker.outputItems.set(outputIndex, parsed.item.id)
-  return JSON.stringify(parsed)
+  const canonicalId =
+    tracker.outputItems.get(outputIndex)
+    || item.id
+    || `oi_${outputIndex}_${randomUUID()}`
+  tracker.outputItems.set(outputIndex, canonicalId)
+  if (item.id === canonicalId) return false
+  item.id = canonicalId
+  return true
 }
 
-const handleOutputItemDone = (
-  parsed: ResponseOutputItemDoneEvent,
-  tracker: StreamIdTracker,
-): string => {
-  const outputIndex = parsed.output_index
-  const originalId = tracker.outputItems.get(outputIndex)
-  if (originalId) {
-    parsed.item.id = originalId
-  }
-  return JSON.stringify(parsed)
-}
-
-const handleItemId = (
+const synchronizeItemId = (
   parsed: ResponseStreamEvent & { output_index?: number; item_id?: string },
   tracker: StreamIdTracker,
-): string => {
+): boolean => {
   const outputIndex = parsed.output_index
-  if (outputIndex !== undefined) {
-    const itemId = tracker.outputItems.get(outputIndex)
-    if (itemId) {
-      parsed.item_id = itemId
-    }
+  if (outputIndex === undefined || typeof parsed.item_id !== "string") {
+    return false
   }
-  return JSON.stringify(parsed)
+  const canonicalId = tracker.outputItems.get(outputIndex) ?? parsed.item_id
+  tracker.outputItems.set(outputIndex, canonicalId)
+  if (parsed.item_id === canonicalId) return false
+  parsed.item_id = canonicalId
+  return true
 }

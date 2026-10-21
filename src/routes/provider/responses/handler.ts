@@ -26,6 +26,10 @@ import {
   filterReasoningForTransport,
 } from "~/routes/responses/utils"
 import { handleResponsesViaMessages } from "~/routes/responses/messages-handler"
+import {
+  createStreamIdTracker,
+  fixStreamIds,
+} from "~/routes/responses/stream-id-sync"
 import { getCodexTaskTitleModel } from "~/routes/responses/task-title"
 import {
   forwardProviderResponseHeaders,
@@ -303,6 +307,7 @@ const streamProviderResponses = async (
   }
 
   return streamSSE(c, async (stream) => {
+    const idTracker = createStreamIdTracker()
     let usage: UsageTokens = {}
 
     const writeChunk = async (chunk: typeof firstChunk) => {
@@ -325,6 +330,14 @@ const streamProviderResponses = async (
       }
 
       if (event) {
+        responseChunk = {
+          ...responseChunk,
+          data: fixStreamIds(
+            responseChunk.data ?? "",
+            responseChunk.event,
+            idTracker,
+          ),
+        }
         const nextUsage = getResponsesStreamEventUsage(event)
         if (nextUsage) {
           usage = nextUsage
