@@ -179,6 +179,22 @@ describe("provider endpoint URL", () => {
     )
   })
 
+  test("uses Copilot's versioned Messages and Chat Completions paths", () => {
+    const provider = createProviderConfig({
+      baseUrl: "https://api.githubcopilot.com",
+      modelsDevProviderId: "github-copilot",
+    })
+    expect(resolveProviderEndpointUrl(provider, "messages")).toBe(
+      "https://api.githubcopilot.com/v1/messages",
+    )
+    expect(resolveProviderEndpointUrl(provider, "chat/completions")).toBe(
+      "https://api.githubcopilot.com/v1/chat/completions",
+    )
+    expect(resolveProviderEndpointUrl(provider, "responses")).toBe(
+      "https://api.githubcopilot.com/responses",
+    )
+  })
+
   test("does not duplicate a catalog URL's final chat endpoint", () => {
     expect(
       resolveProviderEndpointUrl(

@@ -2844,6 +2844,41 @@ describe("model routes", () => {
     ).toBe("gpt-responses-websocket")
   })
 
+  test("keeps explicitly selected live Copilot models that the metadata catalog deprecates", async () => {
+    installModelsDevCatalog({
+      ...modelsDevProviderCatalogFixture,
+      "github-copilot": {
+        models: {
+          "gpt-live-copilot": {
+            id: "gpt-live-copilot",
+            status: "deprecated",
+          },
+        },
+      },
+    })
+    enabledProviders = ["copilot-cli"]
+    providerConfigs["copilot-cli"] = {
+      ...createProviderConfig(
+        "copilot-cli",
+        "https://api.enterprise.githubcopilot.com",
+      ),
+      type: "openai-responses",
+      modelsDevProviderId: "github-copilot",
+      agentsModels: ["gpt-live-copilot"],
+      models: { "gpt-live-copilot": {} },
+    }
+
+    const response = await createApp().request("/v1/models?client=codex", {
+      headers: { "user-agent": "codex-cli/1.0.0" },
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as CodexModelsResponse
+    expect(body.models.map((model) => model.slug)).toContain(
+      "copilot-cli/gpt-live-copilot",
+    )
+  })
+
   test("discovers native Google models in both the regular list and Codex Messages catalog", async () => {
     enabledProviders = ["google"]
     providerConfigs.google = {

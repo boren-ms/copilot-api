@@ -98,8 +98,9 @@ and [ChatGPT sign-in through a gateway guide](https://developers.openai.com/code
 ## Local gateway service
 
 `prepare-gh-auth.mjs` reuses an existing GitHub CLI login through `gh auth token`.
-It configures an `openai-responses` provider named `copilot-cli` using the
-account's GitHub Copilot endpoint directly, and disables the built-in Copilot
+It configures an `openai-responses` provider named `copilot-cli` using every
+enabled, tool-capable Responses, Messages, or Chat Completions model exposed by
+the account's GitHub Copilot endpoint, and disables the built-in Copilot
 provider for this deployment. The older SDK bridge is independent.
 
 The sample systemd user service expects this checkout at `~/code/copilot-api`,

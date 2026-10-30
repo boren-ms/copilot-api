@@ -117,6 +117,22 @@ describe("local gh authentication preparation", () => {
             id: "chat-only",
             supported_endpoints: ["/chat/completions"],
           },
+          {
+            ...target,
+            id: "messages-only",
+            supported_endpoints: ["/v1/messages"],
+          },
+          {
+            ...target,
+            id: "websocket-responses-only",
+            supported_endpoints: ["ws:/responses"],
+          },
+          {
+            ...target,
+            id: "tools-disabled",
+            supported_endpoints: ["/responses"],
+            capabilities: { supports: { tool_calls: false } },
+          },
           { id: "no-endpoints" },
         ],
       },
@@ -141,7 +157,13 @@ describe("local gh authentication preparation", () => {
       enabled: true,
       baseUrl: api,
       apiKey: "test-gh-credential",
-      agentsModels: ["gpt-6.1-sol", "gpt-6-luna"],
+      agentsModels: [
+        "gpt-6.1-sol",
+        "gpt-6-luna",
+        "chat-only",
+        "messages-only",
+        "websocket-responses-only",
+      ],
     })
     expect(provider?.models?.["gpt-6.1-sol"]).toEqual({
       contextWindow: 1050000,
@@ -155,9 +177,21 @@ describe("local gh authentication preparation", () => {
       inputModalities: ["text"],
       supportPdf: false,
     })
+    expect(provider?.models?.["chat-only"]).toMatchObject({
+      type: "openai-compatible",
+    })
+    expect(provider?.models?.["messages-only"]).toMatchObject({
+      type: "anthropic",
+    })
+    expect(provider?.models?.["websocket-responses-only"]).not.toHaveProperty(
+      "type",
+    )
     expect(saved.modelMappings).toEqual({
       "gpt-6.1-sol": "other/custom-model",
       "gpt-6-luna": "copilot-cli/gpt-6-luna",
+      "chat-only": "copilot-cli/chat-only",
+      "messages-only": "copilot-cli/messages-only",
+      "websocket-responses-only": "copilot-cli/websocket-responses-only",
       "codex-auto-review": "copilot-cli/gpt-6-luna",
       "gpt-reserve": "other/reserve",
     })

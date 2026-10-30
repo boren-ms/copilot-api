@@ -256,8 +256,6 @@ export async function handleMergedCodexModels(
           },
         ]
       }
-      if (candidate.catalogMatchRequired) return []
-
       return [
         createSyntheticCodexModel(candidate, template, priorityBase + index),
       ]

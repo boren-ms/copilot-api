@@ -23,6 +23,12 @@ export async function prepareGhAuth(
   { readToken = readGhToken, fetcher = fetch } = {},
 ) {
   const providerName = "copilot-cli"
+  const agentEndpoints = new Set([
+    "/responses",
+    "ws:/responses",
+    "/v1/messages",
+    "/chat/completions",
+  ])
   const token = readToken()
   const headers = {
     Authorization: "Bearer " + token,
@@ -68,8 +74,11 @@ export async function prepareGhAuth(
   }
   const models = catalog.data.filter(
     (model) =>
-      model.supported_endpoints?.includes("/responses")
-      && model.policy?.state !== "disabled",
+      model.policy?.state !== "disabled"
+      && model.capabilities?.supports?.tool_calls !== false
+      && model.supported_endpoints?.some((endpoint) =>
+        agentEndpoints.has(endpoint),
+      ),
   )
   if (
     !models.some(
@@ -99,6 +108,7 @@ export async function prepareGhAuth(
       models.map((model) => {
         const limits = model.capabilities?.limits
         const supports = model.capabilities?.supports
+        const endpoints = model.supported_endpoints ?? []
         const entry = {
           contextWindow: limits?.max_context_window_tokens,
           maxOutputTokens: limits?.max_output_tokens,
@@ -106,6 +116,15 @@ export async function prepareGhAuth(
           supportPdf:
             limits?.vision?.supported_media_types?.includes("application/pdf")
             ?? false,
+        }
+        if (
+          !endpoints.includes("/responses")
+          && !endpoints.includes("ws:/responses")
+        ) {
+          if (endpoints.includes("/v1/messages")) entry.type = "anthropic"
+          else if (endpoints.includes("/chat/completions")) {
+            entry.type = "openai-compatible"
+          }
         }
         if (Array.isArray(supports?.reasoning_effort)) {
           entry.reasoningEfforts = supports.reasoning_effort
@@ -159,7 +178,7 @@ if (
       + result.login
       + "; "
       + result.modelCount
-      + " Responses models at "
+      + " agent models at "
       + result.api,
   )
 }

@@ -126,15 +126,24 @@ async function getProviderCodexCandidates(
       requestHeaders,
     )
     const modelsById = getModelsById(providerModels)
+    const selectedModels = getProviderAgentModels(providerConfig)
     const modelIds = new Set([
       ...modelsById.keys(),
       ...Object.keys(providerConfig.models ?? {}),
-      ...(getProviderAgentModels(providerConfig) ?? []),
+      ...(selectedModels ?? []),
     ])
 
     const candidates: Array<SyntheticCodexModelCandidate> = []
     for (const modelId of modelIds) {
-      if (!isProviderModelVisible(provider, modelId, providerConfig)) continue
+      const isLiveCopilotSelection =
+        providerConfig.modelsDevProviderId === "github-copilot"
+        && selectedModels?.includes(modelId)
+      if (
+        !isLiveCopilotSelection
+        && !isProviderModelVisible(provider, modelId, providerConfig)
+      ) {
+        continue
+      }
       const effectiveType = resolveEffectiveProviderType(
         providerConfig,
         modelId,
@@ -148,7 +157,6 @@ async function getProviderCodexCandidates(
           providerConfig,
           modelId,
           modelsById.get(modelId),
-          effectiveType,
         ),
       )
     }
@@ -169,7 +177,6 @@ function createProviderCodexCandidate(
   providerConfig: ResolvedProviderConfig,
   modelId: string,
   remoteModel: Record<string, unknown> | undefined,
-  effectiveType: ProviderType,
 ): SyntheticCodexModelCandidate {
   const metadata = getModelMetadata(
     providerConfig.name,
@@ -182,17 +189,9 @@ function createProviderCodexCandidate(
     getStringField(remoteModel ?? {}, "display_name")
     ?? getStringField(remoteModel ?? {}, "name")
     ?? modelId
-  // Codex clients only drive gpt-* models through the native Responses API;
-  // other Responses-capable models fall back to the Messages adapter (see
-  // shouldFallbackToMessages), so only gpt-* models require upstream catalog
-  // metadata and the rest can be synthesized like Messages-fallback models.
-  const requiresCatalogMatch =
-    effectiveType === "openai-responses" && modelId.startsWith("gpt")
-
   return {
     slug: `${providerConfig.name}/${modelId}`,
     catalogSlug: modelId,
-    catalogMatchRequired: requiresCatalogMatch,
     providerName: providerConfig.name,
     displayName: `${displayName} (${providerConfig.name})`,
     description: displayName,
