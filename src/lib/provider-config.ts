@@ -23,11 +23,14 @@ import {
   usesModelsDevModelCatalog,
 } from "./provider-model-catalog"
 
+import { getLiveCopilotModelType } from "~/services/copilot/cli-models-cache"
+
 export interface ResolvedProviderConfig {
   name: string
   type: ProviderType
   baseUrl: string
   modelsDevProviderId?: string
+  autoDiscoverCopilotModels?: boolean
   apiKey: string
   authType: ProviderAuthType
   authTypeExplicit?: boolean
@@ -200,6 +203,7 @@ export function getProviderConfig(name: string): ResolvedProviderConfig | null {
     type,
     baseUrl,
     modelsDevProviderId: provider.modelsDevProviderId,
+    autoDiscoverCopilotModels: provider.autoDiscoverCopilotModels,
     apiKey,
     authType,
     authTypeExplicit: provider.authType !== undefined,
@@ -217,6 +221,8 @@ export function resolveEffectiveProviderType(
   if (modelConfig?.type && isSupportedProviderType(modelConfig.type)) {
     return modelConfig.type
   }
+  const liveType = getLiveCopilotModelType(providerConfig, model)
+  if (liveType) return liveType
 
   if (providerConfig.name === "opencode-go") {
     return getOpencodeGoModelProviderType(model)

@@ -63,7 +63,8 @@ export function resolveProviderEndpointUrl(
     providerConfig.modelsDevProviderId === "github-copilot"
     && (endpoint === "messages" || endpoint === "chat/completions")
   ) {
-    return `${providerConfig.baseUrl.replace(/\/+$/u, "")}/v1/${endpoint}`
+    const base = providerConfig.baseUrl.replace(/\/+$/u, "")
+    return `${base.endsWith("/v1") ? base : `${base}/v1`}/${endpoint}`
   }
   const apiBaseUrl =
     providerConfig.modelsDevProviderId ?

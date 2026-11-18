@@ -19,6 +19,7 @@ import {
   getStringField,
 } from "~/routes/models/model-discovery"
 import { getModelMetadata } from "~/routes/models/model-metadata"
+import { usesLiveCopilotModels } from "~/services/copilot/cli-models-cache"
 
 const logger = createHandlerLogger("models-handler")
 const RESPONSES_ENDPOINTS = new Set(["/responses", "ws:/responses"])
@@ -127,17 +128,22 @@ async function getProviderCodexCandidates(
     )
     const modelsById = getModelsById(providerModels)
     const selectedModels = getProviderAgentModels(providerConfig)
-    const modelIds = new Set([
-      ...modelsById.keys(),
-      ...Object.keys(providerConfig.models ?? {}),
-      ...(selectedModels ?? []),
-    ])
+    const liveDiscovery = usesLiveCopilotModels(providerConfig)
+    const modelIds =
+      liveDiscovery ?
+        modelsById.keys()
+      : new Set([
+          ...modelsById.keys(),
+          ...Object.keys(providerConfig.models ?? {}),
+          ...(selectedModels ?? []),
+        ])
 
     const candidates: Array<SyntheticCodexModelCandidate> = []
     for (const modelId of modelIds) {
       const isLiveCopilotSelection =
-        providerConfig.modelsDevProviderId === "github-copilot"
-        && selectedModels?.includes(modelId)
+        liveDiscovery
+        || (providerConfig.modelsDevProviderId === "github-copilot"
+          && selectedModels?.includes(modelId))
       if (
         !isLiveCopilotSelection
         && !isProviderModelVisible(provider, modelId, providerConfig)
@@ -157,6 +163,7 @@ async function getProviderCodexCandidates(
           providerConfig,
           modelId,
           modelsById.get(modelId),
+          effectiveType,
         ),
       )
     }
@@ -177,6 +184,7 @@ function createProviderCodexCandidate(
   providerConfig: ResolvedProviderConfig,
   modelId: string,
   remoteModel: Record<string, unknown> | undefined,
+  effectiveType: ProviderType,
 ): SyntheticCodexModelCandidate {
   const metadata = getModelMetadata(
     providerConfig.name,
@@ -192,6 +200,7 @@ function createProviderCodexCandidate(
   return {
     slug: `${providerConfig.name}/${modelId}`,
     catalogSlug: modelId,
+    usesNativeResponses: effectiveType === "openai-responses",
     providerName: providerConfig.name,
     displayName: `${displayName} (${providerConfig.name})`,
     description: displayName,

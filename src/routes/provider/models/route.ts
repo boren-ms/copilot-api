@@ -9,7 +9,9 @@ import {
   handleCodexModelsProxy,
   isCodexUserAgent,
 } from "~/routes/models/codex-models"
+import { getProviderModelRecords } from "~/routes/models/model-discovery"
 import { getModels as getCodexModels } from "~/services/codex/get-models"
+import { usesLiveCopilotModels } from "~/services/copilot/cli-models-cache"
 import {
   createProviderProxyResponse,
   createProviderProxyResponseHeaders,
@@ -52,12 +54,13 @@ providerModelRoutes.get("/", async (c) => {
       })
     }
 
-    const localModels = getLocalProviderModelRecords(
-      providerConfig.name,
-      providerConfig,
-    )
+    const liveDiscovery = usesLiveCopilotModels(providerConfig)
+    const localModels =
+      liveDiscovery ?
+        await getProviderModelRecords(providerConfig, c.req.raw.headers)
+      : getLocalProviderModelRecords(providerConfig.name, providerConfig)
     if (localModels !== undefined) {
-      if (localModels.length === 0) {
+      if (localModels.length === 0 && !liveDiscovery) {
         return c.json(
           {
             error: {

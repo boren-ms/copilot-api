@@ -148,6 +148,7 @@ export interface CodexInstructionsVariables {
 export interface SyntheticCodexModelCandidate {
   slug: string
   catalogSlug?: string
+  usesNativeResponses?: boolean
   providerName?: string
   displayName: string
   description: string

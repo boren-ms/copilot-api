@@ -110,7 +110,11 @@ describe("local gh authentication preparation", () => {
       catalog: {
         data: [
           target,
-          { id: "gpt-6-luna", supported_endpoints: ["/responses"] },
+          {
+            id: "gpt-6-luna",
+            supported_endpoints: ["/responses"],
+            capabilities: { supports: { tool_calls: true } },
+          },
           { ...target, id: "disabled", policy: { state: "disabled" } },
           {
             ...target,
@@ -157,14 +161,9 @@ describe("local gh authentication preparation", () => {
       enabled: true,
       baseUrl: api,
       apiKey: "test-gh-credential",
-      agentsModels: [
-        "gpt-6.1-sol",
-        "gpt-6-luna",
-        "chat-only",
-        "messages-only",
-        "websocket-responses-only",
-      ],
+      autoDiscoverCopilotModels: true,
     })
+    expect(provider?.agentsModels).toBeUndefined()
     expect(provider?.models?.["gpt-6.1-sol"]).toEqual({
       contextWindow: 1050000,
       maxOutputTokens: 128000,
@@ -218,6 +217,27 @@ describe("local gh authentication preparation", () => {
     expect(f.read().providers?.["github-copilot"]?.enabled).toBe(false)
   })
 
+  test.each([false, true])(
+    "keeps a model selection only when it was set after opting in (%s)",
+    async (autoDiscoverCopilotModels) => {
+      const f = fixture({
+        config: {
+          providers: {
+            "copilot-cli": {
+              autoDiscoverCopilotModels,
+              agentsModels: ["gpt-future-sol"],
+            },
+          },
+        },
+        catalog: { data: [{ ...target, id: "gpt-future-sol" }] },
+      })
+      await f.run()
+      expect(f.read().providers?.["copilot-cli"]?.agentsModels).toEqual(
+        autoDiscoverCopilotModels ? ["gpt-future-sol"] : undefined,
+      )
+    },
+  )
+
   test.each([
     "https://example.com",
     "http://api.enterprise.githubcopilot.com",
@@ -257,7 +277,7 @@ describe("local gh authentication preparation", () => {
     "rejects accounts lacking the required model and tools: %j",
     async ({ data }) => {
       const f = fixture({ catalog: { data } })
-      await expectFailure(f.run, "GPT-6.1 Sol with tool support")
+      await expectFailure(f.run, "eligible agent models")
       expect(fs.readFileSync(f.configPath, "utf8")).toBe(f.original)
     },
   )

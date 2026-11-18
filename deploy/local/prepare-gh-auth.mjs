@@ -74,20 +74,18 @@ export async function prepareGhAuth(
   }
   const models = catalog.data.filter(
     (model) =>
-      model.policy?.state !== "disabled"
-      && model.capabilities?.supports?.tool_calls !== false
-      && model.supported_endpoints?.some((endpoint) =>
+      typeof model?.id === "string"
+      && /^[a-z0-9][a-z0-9._-]*$/iu.test(model.id)
+      && Array.isArray(model.supported_endpoints)
+      && model.supported_endpoints.some((endpoint) =>
         agentEndpoints.has(endpoint),
-      ),
+      )
+      && model.policy?.state !== "disabled"
+      && model.capabilities?.supports?.tool_calls !== false,
   )
-  if (
-    !models.some(
-      (model) =>
-        model.id === "gpt-6.1-sol" && model.capabilities?.supports?.tool_calls,
-    )
-  ) {
+  if (models.length === 0) {
     throw new Error(
-      "The authenticated account does not expose GPT-6.1 Sol with tool support.",
+      "The authenticated account does not expose any eligible agent models.",
     )
   }
   const config = JSON.parse(await readFile(configPath, "utf8"))
@@ -96,14 +94,19 @@ export async function prepareGhAuth(
     ...config.providers["github-copilot"],
     enabled: false,
   }
+  const previousProvider = config.providers[providerName]
   config.providers[providerName] = {
     type: "openai-responses",
     enabled: true,
     baseUrl: api.origin,
     modelsDevProviderId: "github-copilot",
+    autoDiscoverCopilotModels: true,
     authType: "authorization",
     apiKey: token,
-    agentsModels: models.map((model) => model.id),
+    ...(previousProvider?.autoDiscoverCopilotModels
+      && Array.isArray(previousProvider.agentsModels) && {
+        agentsModels: previousProvider.agentsModels,
+      }),
     models: Object.fromEntries(
       models.map((model) => {
         const limits = model.capabilities?.limits

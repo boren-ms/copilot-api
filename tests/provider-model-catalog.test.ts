@@ -20,6 +20,54 @@ import {
 beforeEach(() => installModelsDevCatalog(modelsDevProviderCatalogFixture))
 
 describe("provider model catalogs", () => {
+  test("adds configured models missing from the catalog without duplicating catalog entries", () => {
+    const catalogRecords = getLocalProviderModelRecords("xai")!
+    const records = getLocalProviderModelRecords("copilot-cli", {
+      modelsDevProviderId: "xai",
+      models: {
+        "grok-4.7": { contextWindow: 123 },
+        "gpt-6.2-sol": {
+          contextWindow: 1_050_000,
+          maxOutputTokens: 128_000,
+          inputModalities: ["text", "image"],
+          reasoningEfforts: ["low", "high", "max"],
+        },
+        " ": {},
+      },
+    })!
+    expect(records.slice(0, catalogRecords.length)).toEqual(catalogRecords)
+    expect(records.filter((model) => model.id === "grok-4.7")).toHaveLength(1)
+    expect(records.at(-1)).toEqual({
+      id: "gpt-6.2-sol",
+      name: "gpt-6.2-sol",
+      object: "model",
+      context_window: 1_050_000,
+      max_output_tokens: 128_000,
+      input_modalities: ["text", "image"],
+      reasoning_efforts: ["low", "high", "max"],
+    })
+    expect(records).toHaveLength(catalogRecords.length + 1)
+    expect(getLocalProviderModelRecords("xai")).toEqual(catalogRecords)
+  })
+
+  test("keeps catalog-hidden models hidden even when configured locally", () => {
+    installModelsDevCatalog({
+      ...modelsDevProviderCatalogFixture,
+      custom: {
+        models: {
+          old: { id: "old", status: "deprecated" },
+          early: { id: "early", release_date: "2026-04-30" },
+        },
+      },
+    })
+    expect(
+      getLocalProviderModelRecords("copilot-cli", {
+        modelsDevProviderId: "custom",
+        models: { old: {}, early: {}, fresh: {} },
+      })?.map((model) => model.id),
+    ).toEqual(["fresh"])
+  })
+
   test.each<[string | undefined, string]>([
     ["https://api.kimi.com/coding", "kimi-code-plan-cn"],
     ["https://api.kimi.ai/coding", "kimi-code-plan-global"],

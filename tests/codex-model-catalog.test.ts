@@ -132,16 +132,25 @@ describe("Codex model catalog", () => {
     expect(body.models.map((m) => m.slug)).toEqual(models.map((m) => m.slug))
     expect(body.extra).toEqual({ preserved: true })
   })
-  test("prioritizes explicit models when the byte budget cannot fit every model", () => {
+  test("fits explicit and newly discovered models before ordinary models", () => {
     const models = Array.from({ length: 25 }, (_, i) => model(`model-${i}`))
     for (const item of models)
       item.model_messages.instructions_template = "x".repeat(50_000)
     const body = parse(
-      serialize({ models }, { explicitSlugs: new Set(["model-24"]) }),
+      serialize(
+        { models },
+        {
+          explicitSlugs: new Set(["model-24"]),
+          preferredSlugs: new Set(["model-23"]),
+        },
+      ),
     )
     expect(body.models.length).toBeLessThan(25)
-    expect(body.models.at(-1)?.slug).toBe("model-24")
-    expect(body.models.some((item) => item.slug === "model-23")).toBe(false)
+    expect(body.models.slice(-2).map((item) => item.slug)).toEqual([
+      "model-23",
+      "model-24",
+    ])
+    expect(body.models.some((item) => item.slug === "model-22")).toBe(false)
     expect(Buffer.byteLength(JSON.stringify(body))).toBeLessThanOrEqual(
       CODEX_MODEL_CATALOG_MAX_BYTES,
     )

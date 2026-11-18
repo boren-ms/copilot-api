@@ -79,15 +79,35 @@ export function isProviderModelVisible(
 
 export function getLocalProviderModelRecords(
   provider: string,
-  config?: CatalogProviderConfig | null,
+  config?: ProviderConfig | null,
 ): Array<Record<string, unknown>> | undefined {
   if (provider === "opencode-go") return getOpencodeGoModelRecords()
   if (!config?.modelsDevProviderId && !usesModelsDevModelCatalog(provider)) {
     return undefined
   }
-  return getModelsDevProviderModelRecords(
-    resolveProviderModelsDevId(provider, config),
+  const catalogId = resolveProviderModelsDevId(provider, config)
+  const records = getModelsDevProviderModelRecords(catalogId)
+  const catalogIds = new Set(records.map((model) => model.id))
+  const configuredRecords = getConfiguredProviderModelRecords(config).filter(
+    ({ id }) => !catalogIds.has(id) && isModelsDevModelVisible(catalogId, id),
   )
+  return [...records, ...configuredRecords]
+}
+
+export function getConfiguredProviderModelRecords(
+  config: ProviderConfig | null | undefined,
+) {
+  return Object.entries(config?.models ?? {})
+    .filter(([id]) => id.trim())
+    .map(([id, model]) => ({
+      id,
+      name: id,
+      object: "model",
+      context_window: model.contextWindow,
+      max_output_tokens: model.maxOutputTokens,
+      input_modalities: model.inputModalities,
+      reasoning_efforts: model.reasoningEfforts,
+    }))
 }
 
 export function getProviderModelConfig(

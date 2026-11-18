@@ -15,6 +15,7 @@ import { createHandlerLogger } from "~/lib/logger"
 import { withModelDisplayName } from "~/lib/model-display-name"
 import { toClientModelId } from "~/lib/models"
 import {
+  getConfiguredProviderModelRecords,
   getLocalProviderModelRecords,
   isProviderModelVisible,
 } from "~/lib/provider-model-catalog"
@@ -23,6 +24,10 @@ import { getProviderAgentModels } from "~/lib/provider-management"
 import { state } from "~/lib/state"
 import type { Model } from "~/lib/types/models"
 import { getModels as getCodexModels } from "~/services/codex/get-models"
+import {
+  getLiveCopilotModels,
+  usesLiveCopilotModels,
+} from "~/services/copilot/cli-models-cache"
 import { forwardProviderModels } from "~/services/providers/provider-proxy"
 
 const logger = createHandlerLogger("models-handler")
@@ -141,7 +146,12 @@ function normalizeProviderModel(
   }
 
   const rawId = getStringField(model, "id")
-  if (!rawId || !isProviderModelVisible(provider, rawId, config)) {
+  const liveDiscovery =
+    provider === "copilot-cli" && config?.autoDiscoverCopilotModels === true
+  if (
+    !rawId
+    || (!liveDiscovery && !isProviderModelVisible(provider, rawId, config))
+  ) {
     return null
   }
 
@@ -176,6 +186,13 @@ export async function getProviderModelRecords(
   providerConfig: ResolvedProviderConfig,
   requestHeaders: Headers,
 ): Promise<Array<Record<string, unknown>>> {
+  if (usesLiveCopilotModels(providerConfig)) {
+    const live = await getLiveCopilotModels(providerConfig)
+    return (
+      live?.map(normalizeModelCapabilities)
+      ?? getConfiguredProviderModelRecords(providerConfig)
+    )
+  }
   const localModels = getLocalProviderModelRecords(
     providerConfig.name,
     providerConfig,
@@ -324,6 +341,12 @@ function selectAgentProviderModels(
   const selection = getProviderAgentModels(providerConfig)
   if (selection === undefined) return models
   const modelsById = getModelsById(models)
+  if (providerConfig?.autoDiscoverCopilotModels) {
+    return selection.flatMap((id) => {
+      const model = modelsById.get(id)
+      return model ? [model] : []
+    })
+  }
   return selection.map((id) => modelsById.get(id) ?? { id })
 }
 

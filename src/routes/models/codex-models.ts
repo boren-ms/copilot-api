@@ -191,6 +191,7 @@ export async function handleMergedCodexModels(
         || isProviderAgentModelVisible(copilotConfig, model.slug)),
   )
   const explicitSlugs = new Set<string>()
+  const preferredSlugs = new Set<string>()
   const codexSelection = getProviderAgentModels(codexConfig)
   for (const model of visibleUpstreamModels) {
     if (codexSelection?.includes(model.slug)) {
@@ -217,6 +218,14 @@ export async function handleMergedCodexModels(
     if (!isProviderAgentModelVisible(config, selectionId)) return false
     if (selectedModels?.includes(selectionId)) {
       explicitSlugs.add(candidate.slug)
+    }
+    if (
+      providerName === "copilot-cli"
+      && config?.autoDiscoverCopilotModels
+      && (candidate.usesNativeResponses
+        || !Object.hasOwn(config.models ?? {}, modelId))
+    ) {
+      preferredSlugs.add(candidate.slug)
     }
     return true
   })
@@ -276,6 +285,7 @@ export async function handleMergedCodexModels(
     response,
     explicitSlugs,
     template.model_messages ?? FALLBACK_CODEX_MODELS[0].model_messages,
+    preferredSlugs,
   )
 }
 
@@ -284,11 +294,13 @@ function createCodexCatalogResponse(
   response: CodexModelsResponse,
   explicitSlugs: ReadonlySet<string>,
   fallback: CodexModel["model_messages"],
+  preferredSlugs?: ReadonlySet<string>,
 ): Response {
   const body = serializeCodexModelCatalog(response, {
     headers: c.req.raw.headers,
     modern: isModernCodexClient(c.req.url, c.req.raw.headers),
     explicitSlugs,
+    preferredSlugs,
     fallback,
   })
   if (body === null) {

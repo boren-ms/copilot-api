@@ -193,6 +193,12 @@ describe("provider endpoint URL", () => {
     expect(resolveProviderEndpointUrl(provider, "responses")).toBe(
       "https://api.githubcopilot.com/responses",
     )
+    expect(
+      resolveProviderEndpointUrl(
+        { ...provider, baseUrl: "https://api.githubcopilot.com/v1" },
+        "messages",
+      ),
+    ).toBe("https://api.githubcopilot.com/v1/messages")
   })
 
   test("does not duplicate a catalog URL's final chat endpoint", () => {

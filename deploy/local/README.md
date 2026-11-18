@@ -133,6 +133,16 @@ updates credentials and model metadata in `COPILOT_API_HOME/config.json`
 (default `~/.local/share/copilot-api/config.json`). It fails explicitly when
 authentication, model discovery, or writing fails, and never prints tokens.
 
+The startup hook enables `autoDiscoverCopilotModels` for `copilot-cli`. The
+gateway uses the authenticated Copilot account's model catalog for discovery,
+including the Codex picker. The next list request after five minutes refreshes
+the catalog, without a gateway restart or a per-model code change. Models are
+eligible when Copilot advertises an agent endpoint and has not disabled the
+model or tool calls. During temporary failures the gateway uses the last available
+catalog (or the startup snapshot before the first successful refresh).
+The first startup with this setting removes the old generated model selection;
+an explicit `agentsModels` selection made afterward still limits the picker.
+
 `copilot-api-community.config.toml` is a reference configuration for manual
 setup. Merge it into the active `config.toml` and install the environment helper
 using the installer; Codex does not automatically load a separate file by this

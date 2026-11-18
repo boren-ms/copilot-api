@@ -63,6 +63,7 @@ export function serializeCodexModelCatalog(
     headers: Headers
     modern: boolean
     explicitSlugs: ReadonlySet<string>
+    preferredSlugs?: ReadonlySet<string>
     fallback: CodexModelMessages
   },
 ): string | null {
@@ -93,7 +94,9 @@ export function serializeCodexModelCatalog(
   const ordered = [...eligibleModels].sort(
     (a, b) =>
       Number(options.explicitSlugs.has(b.slug))
-      - Number(options.explicitSlugs.has(a.slug)),
+        - Number(options.explicitSlugs.has(a.slug))
+      || Number(options.preferredSlugs?.has(b.slug) ?? false)
+        - Number(options.preferredSlugs?.has(a.slug) ?? false),
   )
   for (const model of ordered) {
     const additionalBytes =

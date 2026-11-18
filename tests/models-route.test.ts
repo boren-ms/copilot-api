@@ -14,6 +14,7 @@ import path from "node:path"
 
 import type { ResolvedProviderConfig } from "~/lib/config"
 import { installModelsDevCatalog } from "~/lib/models-dev-cache"
+import { resolveProviderConfigForModel } from "~/lib/provider-config"
 import { PATHS } from "~/lib/paths"
 import { defaultConfig, invalidateConfigCache } from "~/lib/config-store"
 import type { ModelsResponse } from "~/lib/types/models"
@@ -437,6 +438,33 @@ describe("model routes", () => {
       expect(fetchMock).not.toHaveBeenCalled()
     },
   )
+
+  test("lists a configured Copilot model absent from its local catalog", async () => {
+    enabledProviders = ["copilot-cli"]
+    providerConfigs["copilot-cli"] = {
+      ...createProviderConfig("copilot-cli", "https://reject.example"),
+      modelsDevProviderId: "xai",
+      models: {
+        "gpt-6.2-sol": { contextWindow: 1_050_000 },
+      },
+    }
+    const app = createApp()
+    for (const endpoint of ["/models", "/v1/models"]) {
+      const response = await app.request(endpoint)
+      expect(response.status).toBe(200)
+      const body = (await response.json()) as {
+        data: Array<{ id: string; context_window?: number }>
+      }
+      expect(
+        body.data.find((model) => model.id === "copilot-cli/gpt-6.2-sol"),
+      ).toMatchObject({ context_window: 1_050_000 })
+    }
+    const raw = await app.request("/copilot-cli/v1/models")
+    expect(raw.status).toBe(200)
+    const body = (await raw.json()) as { data: Array<{ id: string }> }
+    expect(body.data.map((model) => model.id)).toContain("gpt-6.2-sol")
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 
   test.each(["xai", "openrouter", "deepseek", "kimi", "dashscope", "alibaba"])(
     "returns a local catalog error for missing %s records without remote fallback",
@@ -3075,6 +3103,245 @@ describe("model routes", () => {
     },
     5_000,
   )
+
+  test.each(["/models", "/v1/models"])(
+    "lists explicitly configured GPT models missing from the Codex catalog on %s",
+    async (endpoint) => {
+      expect(bundledCodexSlugs).not.toContain("gpt-6.2-sol")
+      installModelsDevCatalog({
+        ...modelsDevProviderCatalogFixture,
+        "github-copilot": {
+          models: {
+            "gpt-unconfigured": { id: "gpt-unconfigured" },
+          },
+        },
+      })
+      enabledProviders = ["copilot-cli"]
+      providerConfigs["copilot-cli"] = {
+        ...createProviderConfig("copilot-cli", "https://reject.example"),
+        type: "openai-responses",
+        modelsDevProviderId: "github-copilot",
+        agentsModels: ["gpt-6.2-sol", "gpt-unconfigured"],
+        models: {
+          "gpt-6.2-sol": {
+            contextWindow: 1_050_000,
+            maxOutputTokens: 128_000,
+            inputModalities: ["text", "image"],
+            reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+            defaultReasoningEffort: "medium",
+          },
+          "gpt-hidden": {},
+        },
+      }
+      const response = await createApp().request(
+        `${endpoint}?client_version=0.169.0`,
+        { headers: { "user-agent": "codex_desktop/0.169.0" } },
+      )
+      expect(response.status).toBe(200)
+      const body = (await response.json()) as CodexModelsResponse
+      const models = body.models.filter(
+        (model) => model.slug === "copilot-cli/gpt-6.2-sol",
+      )
+      expect(models).toHaveLength(1)
+      expect(models[0]).toMatchObject({
+        visibility: "list",
+        supported_in_api: true,
+        context_window: 1_050_000,
+        max_output_tokens: 128_000,
+        input_modalities: ["text", "image"],
+        default_reasoning_level: "medium",
+      })
+      expect(models[0].supported_reasoning_levels).toContainEqual({
+        effort: "max",
+        description: "max reasoning effort",
+      })
+      expect(models[0].model_messages?.instructions_template).toBeTruthy()
+      expect(body.models.map((model) => model.slug)).toContain(
+        "copilot-cli/gpt-unconfigured",
+      )
+      expect(body.models.map((model) => model.slug)).not.toContain(
+        "copilot-cli/gpt-hidden",
+      )
+      expect(fetchMock).not.toHaveBeenCalled()
+    },
+  )
+
+  test("refreshes the account's Copilot catalog without model configuration changes", async () => {
+    const now = spyOn(Date, "now")
+    let time = Date.now()
+    now.mockImplementation(() => time)
+    try {
+      enabledProviders = ["copilot-cli"]
+      const provider: ResolvedProviderConfig = {
+        ...createProviderConfig(
+          "copilot-cli",
+          "https://copilot-refresh.example",
+        ),
+        type: "openai-responses",
+        modelsDevProviderId: "github-copilot",
+        autoDiscoverCopilotModels: true,
+        models: { "gpt-startup-only": { contextWindow: 400_000 } },
+      }
+      providerConfigs["copilot-cli"] = provider
+      const future = {
+        id: "gpt-future-sol",
+        name: "GPT Future Sol",
+        supported_endpoints: ["/responses"],
+        capabilities: {
+          limits: {
+            max_context_window_tokens: 800_000,
+            max_output_tokens: 100_000,
+          },
+          supports: {
+            tool_calls: true,
+            vision: true,
+            reasoning_effort: ["low", "max"],
+          },
+        },
+      }
+      fetchMock.mockImplementationOnce(() =>
+        Promise.resolve(new Response(null, { status: 503 })),
+      )
+      fetchMock.mockImplementationOnce(() =>
+        Promise.resolve(
+          Response.json({ data: [{ ...future, id: "gpt-first" }] }),
+        ),
+      )
+      fetchMock.mockImplementationOnce(() =>
+        Promise.resolve(
+          Response.json({
+            data: [
+              future,
+              { ...future, id: "gpt-disabled", policy: { state: "disabled" } },
+              {
+                ...future,
+                id: "gpt-chat",
+                supported_endpoints: ["/chat/completions"],
+              },
+              {
+                ...future,
+                id: "claude-future",
+                supported_endpoints: ["/v1/messages"],
+              },
+              {
+                ...future,
+                id: "gpt-no-tools",
+                capabilities: { supports: { tool_calls: false } },
+              },
+              { ...future, id: "invalid/model" },
+              null,
+            ],
+          }),
+        ),
+      )
+      fetchMock.mockImplementationOnce(() =>
+        Promise.resolve(new Response(null, { status: 503 })),
+      )
+      fetchMock.mockImplementationOnce(() =>
+        Promise.resolve(new Response(null, { status: 403 })),
+      )
+      const app = createApp(false)
+      const request = async () => {
+        const response = await app.request("/models?client_version=0.169.0", {
+          headers: { "user-agent": "codex_desktop/0.169.0" },
+        })
+        expect(response.status).toBe(200)
+        const body = (await response.json()) as CodexModelsResponse
+        return body.models.filter((model) =>
+          model.slug.startsWith("copilot-cli/"),
+        )
+      }
+      expect((await request()).map((model) => model.slug)).toEqual([
+        "copilot-cli/gpt-startup-only",
+      ])
+      time += 30_000
+      const [first, concurrent] = await Promise.all([request(), request()])
+      expect(first.map((model) => model.slug)).toEqual([
+        "copilot-cli/gpt-first",
+      ])
+      expect(concurrent).toEqual(first)
+      expect(await request()).toEqual(first)
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      const [url, options] = fetchMock.mock.calls[0]
+      expect(url instanceof URL ? url.href : url).toBe(
+        "https://copilot-refresh.example/models",
+      )
+      expect(new Headers(options?.headers).get("user-agent")).toBe(
+        "GitHubCopilotCLI/1.0.100",
+      )
+      expect(options?.redirect).toBe("error")
+      time += 5 * 60_000
+      const updated = await request()
+      expect(updated.map((model) => model.slug)).toEqual([
+        "copilot-cli/gpt-future-sol",
+        "copilot-cli/gpt-chat",
+        "copilot-cli/claude-future",
+      ])
+      expect(updated[0]).toMatchObject({
+        slug: "copilot-cli/gpt-future-sol",
+        display_name: "GPT Future Sol (copilot-cli)",
+        visibility: "list",
+        context_window: 800_000,
+        max_output_tokens: 100_000,
+        input_modalities: ["text", "image"],
+      })
+      const scoped = await app.request("/copilot-cli/v1/models")
+      expect(await scoped.json()).toMatchObject({
+        data: [
+          { id: "gpt-future-sol" },
+          { id: "gpt-chat" },
+          { id: "claude-future" },
+        ],
+      })
+      expect(resolveProviderConfigForModel(provider, "gpt-chat").type).toBe(
+        "openai-compatible",
+      )
+      expect(
+        resolveProviderConfigForModel(provider, "claude-future").type,
+      ).toBe("anthropic")
+      provider.agentsModels = ["gpt-first"]
+      expect(await request()).toEqual([])
+      delete provider.agentsModels
+      time += 5 * 60_000
+      expect(await request()).toEqual(updated)
+      time += 30_000
+      expect(await request()).toEqual([])
+      expect(fetchMock).toHaveBeenCalledTimes(5)
+    } finally {
+      now.mockRestore()
+    }
+  })
+
+  test("retains live Copilot Responses models when the Codex catalog is full", async () => {
+    enabledProviders = ["copilot-cli"]
+    const models = [
+      ...Array.from({ length: 25 }, (_, i) => ({
+        id: `chat-model-${i}`,
+        supported_endpoints: ["/chat/completions"],
+      })),
+      { id: "gpt-6.1-sol", supported_endpoints: ["/responses"] },
+      { id: "gpt-future-sol", supported_endpoints: ["/responses"] },
+    ]
+    providerConfigs["copilot-cli"] = {
+      ...createProviderConfig("copilot-cli", "https://copilot-size.example"),
+      type: "openai-responses",
+      autoDiscoverCopilotModels: true,
+      models: Object.fromEntries(models.slice(0, -1).map(({ id }) => [id, {}])),
+    }
+    fetchMock.mockImplementationOnce(() =>
+      Promise.resolve(Response.json({ data: models })),
+    )
+    const response = await createApp(false).request(
+      "/models?client_version=0.169.0",
+      { headers: { "user-agent": "codex_desktop/0.169.0" } },
+    )
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as CodexModelsResponse
+    const slugs = body.models.map((model) => model.slug)
+    expect(slugs).toContain("copilot-cli/gpt-6.1-sol")
+    expect(slugs).toContain("copilot-cli/gpt-future-sol")
+    expect(slugs).not.toContain("copilot-cli/chat-model-24")
+  })
 
   test("copies matching Codex catalog models with provider suffixes", async () => {
     const solCatalogModel = {
