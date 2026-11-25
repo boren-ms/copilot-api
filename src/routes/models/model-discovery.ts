@@ -25,6 +25,7 @@ import { state } from "~/lib/state"
 import type { Model } from "~/lib/types/models"
 import { getModels as getCodexModels } from "~/services/codex/get-models"
 import {
+  filterCopilotModelRecords,
   getLiveCopilotModels,
   usesLiveCopilotModels,
 } from "~/services/copilot/cli-models-cache"
@@ -188,9 +189,10 @@ export async function getProviderModelRecords(
 ): Promise<Array<Record<string, unknown>>> {
   if (usesLiveCopilotModels(providerConfig)) {
     const live = await getLiveCopilotModels(providerConfig)
-    return (
+    return filterCopilotModelRecords(
+      providerConfig,
       live?.map(normalizeModelCapabilities)
-      ?? getConfiguredProviderModelRecords(providerConfig)
+        ?? getConfiguredProviderModelRecords(providerConfig),
     )
   }
   const localModels = getLocalProviderModelRecords(

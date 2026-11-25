@@ -3166,6 +3166,131 @@ describe("model routes", () => {
     },
   )
 
+  test("filters Copilot models in every client catalog across fallback and refresh", async () => {
+    const now = spyOn(Date, "now")
+    let time = Date.now()
+    now.mockImplementation(() => time)
+    try {
+      const excludedModelPrefixes = [
+        "mai",
+        "grok",
+        "claude-haiku",
+        "claude-sonnet",
+        "gemini-3.8",
+        "gpt-5.3",
+        "gpt-5.4",
+        "gpt-5.6",
+      ]
+      const hidden = [
+        "mai-code-2",
+        "grok-4.7",
+        "claude-haiku-5.5",
+        "claude-sonnet-5.5",
+        "gemini-3.8-flash",
+        "gpt-5.3-codex",
+        "gpt-5.4-nano",
+        "gpt-5.6-sol-fast",
+      ]
+      const visible = ["claude-opus-5.5", "gemini-4-carbon", "gpt-6.1-sol"]
+      const modelType = (id: string) =>
+        id.startsWith("claude-") ? "anthropic"
+        : id.startsWith("gemini-") ? "openai-compatible"
+        : "openai-responses"
+      enabledProviders = ["copilot-cli"]
+      providerConfigs["copilot-cli"] = {
+        ...createProviderConfig(
+          "copilot-cli",
+          "https://copilot-filter.example",
+        ),
+        type: "openai-responses",
+        modelsDevProviderId: "github-copilot",
+        autoDiscoverCopilotModels: true,
+        excludedModelPrefixes,
+        models: Object.fromEntries(
+          [...hidden, ...visible].map((id) => [id, { type: modelType(id) }]),
+        ),
+      }
+      const toLiveModel = (id: string) => ({
+        id,
+        supported_endpoints: [
+          modelType(id) === "anthropic" ? "/v1/messages"
+          : modelType(id) === "openai-compatible" ? "/chat/completions"
+          : "/responses",
+        ],
+        capabilities: { supports: { tool_calls: true } },
+      })
+      fetchMock.mockImplementationOnce(() =>
+        Promise.resolve(new Response(null, { status: 503 })),
+      )
+      fetchMock.mockImplementationOnce(() =>
+        Promise.resolve(
+          Response.json({
+            data: [...hidden, ...visible, "gpt-6.2-sol"].map(toLiveModel),
+          }),
+        ),
+      )
+      fetchMock.mockImplementationOnce(() =>
+        Promise.resolve(
+          Response.json({
+            data: [
+              ...hidden,
+              ...visible,
+              "gpt-6.2-sol",
+              "gemini-4-neon",
+              "grok-9",
+            ].map(toLiveModel),
+          }),
+        ),
+      )
+      const app = createApp(false)
+      const assertCatalogs = async (expected: Array<string>) => {
+        for (const endpoint of ["/models", "/v1/models"]) {
+          const response = await app.request(endpoint)
+          expect(response.status).toBe(200)
+          const { data } = (await response.json()) as {
+            data: Array<{ id: string }>
+          }
+          expect(data.map((model) => model.id)).toEqual(
+            expected.map((id) => `copilot-cli/${id}`),
+          )
+        }
+        const scoped = await app.request("/copilot-cli/v1/models")
+        expect(scoped.status).toBe(200)
+        const body = (await scoped.json()) as { data: Array<{ id: string }> }
+        expect(body.data.map((model) => model.id)).toEqual(expected)
+        const codex = await app.request("/models?client_version=0.169.0", {
+          headers: { "user-agent": "codex_desktop/0.169.0" },
+        })
+        expect(codex.status).toBe(200)
+        const catalog = (await codex.json()) as CodexModelsResponse
+        expect(
+          catalog.models
+            .filter((model) => model.slug.startsWith("copilot-cli/"))
+            .map((model) => model.slug),
+        ).toEqual(expected.map((id) => `copilot-cli/${id}`))
+        const opencode = await app.request("/v1/models", {
+          headers: { "user-agent": "opencode" },
+        })
+        expect(opencode.status).toBe(200)
+        const openCatalog = (await opencode.json()) as {
+          data: Array<{ id: string }>
+        }
+        expect(openCatalog.data.map((model) => model.id)).toEqual(
+          expected.map((id) => `copilot-cli/${id}`),
+        )
+      }
+      await assertCatalogs(visible)
+      time += 30_000
+      await assertCatalogs([...visible, "gpt-6.2-sol"])
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      time += 5 * 60_000
+      await assertCatalogs([...visible, "gpt-6.2-sol", "gemini-4-neon"])
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+    } finally {
+      now.mockRestore()
+    }
+  })
+
   test("refreshes the account's Copilot catalog without model configuration changes", async () => {
     const now = spyOn(Date, "now")
     let time = Date.now()

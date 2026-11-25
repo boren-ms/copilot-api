@@ -140,6 +140,25 @@ the catalog, without a gateway restart or a per-model code change. Models are
 eligible when Copilot advertises an agent endpoint and has not disabled the
 model or tool calls. During temporary failures the gateway uses the last available
 catalog (or the startup snapshot before the first successful refresh).
+Set `providers["copilot-cli"].excludedModelPrefixes` in the gateway's
+`config.json` to hide model families or versions from all live Copilot model
+lists, including the Codex picker. For example:
+
+```json
+"excludedModelPrefixes": [
+  "mai", "grok", "claude-haiku", "claude-sonnet",
+  "gemini-3.8", "gpt-5.3", "gpt-5.4", "gpt-5.6"
+]
+```
+
+Prefixes match an exact model ID or its hyphen suffixes, case-insensitively.
+For example, `gpt-5.6` hides `gpt-5.6-sol-fast` but not `gpt-5.60-sol`.
+Exclusions also apply to the startup snapshot during discovery failures.
+The authentication hook preserves this setting across restarts. Restart after
+editing the config; copy this non-secret setting to other gateway nodes to use
+the same filter. Omit the setting or use an empty array to disable filtering.
+This controls advertised models; direct requests to excluded IDs remain possible.
+
 The first startup with this setting removes the old generated model selection;
 an explicit `agentsModels` selection made afterward still limits the picker.
 

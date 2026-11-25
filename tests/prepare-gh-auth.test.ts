@@ -208,6 +208,23 @@ describe("local gh authentication preparation", () => {
     }
   })
 
+  test("preserves configured model exclusions across authentication refreshes", async () => {
+    const excludedModelPrefixes = ["mai", "grok", "gpt-5.6"]
+    const f = fixture({
+      config: {
+        providers: { "copilot-cli": { excludedModelPrefixes } },
+      },
+    })
+    await f.run()
+    await f.run()
+    expect(f.read().providers?.["copilot-cli"]?.excludedModelPrefixes).toEqual(
+      excludedModelPrefixes,
+    )
+    expect(
+      f.read().providers?.["copilot-cli"]?.models?.["gpt-6.1-sol"],
+    ).toBeDefined()
+  })
+
   test("initializes provider and mapping tables in an empty config", async () => {
     const f = fixture()
     await f.run()

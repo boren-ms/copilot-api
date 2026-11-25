@@ -18,6 +18,25 @@ export function usesLiveCopilotModels(
   )
 }
 
+export function filterCopilotModelRecords(
+  provider: ResolvedProviderConfig,
+  models: Catalog,
+): Catalog {
+  const prefixes =
+    provider.excludedModelPrefixes
+      ?.map((prefix) => prefix.trim().toLowerCase())
+      .filter(Boolean) ?? []
+  if (prefixes.length === 0) return models
+
+  return models.filter((model) => {
+    if (typeof model.id !== "string") return true
+    const id = model.id.toLowerCase()
+    return !prefixes.some(
+      (prefix) => id === prefix || id.startsWith(`${prefix}-`),
+    )
+  })
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }

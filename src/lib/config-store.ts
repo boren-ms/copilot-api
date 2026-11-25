@@ -138,6 +138,7 @@ export interface ProviderConfig {
   baseUrl?: string
   modelsDevProviderId?: string
   autoDiscoverCopilotModels?: boolean
+  excludedModelPrefixes?: Array<string>
   apiKey?: string
   authType?: ProviderAuthType
   accountId?: string

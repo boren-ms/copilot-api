@@ -101,6 +101,9 @@ export async function prepareGhAuth(
     baseUrl: api.origin,
     modelsDevProviderId: "github-copilot",
     autoDiscoverCopilotModels: true,
+    ...(Array.isArray(previousProvider?.excludedModelPrefixes) && {
+      excludedModelPrefixes: previousProvider.excludedModelPrefixes,
+    }),
     authType: "authorization",
     apiKey: token,
     ...(previousProvider?.autoDiscoverCopilotModels

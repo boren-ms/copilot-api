@@ -31,6 +31,7 @@ export interface ResolvedProviderConfig {
   baseUrl: string
   modelsDevProviderId?: string
   autoDiscoverCopilotModels?: boolean
+  excludedModelPrefixes?: Array<string>
   apiKey: string
   authType: ProviderAuthType
   authTypeExplicit?: boolean
@@ -204,6 +205,7 @@ export function getProviderConfig(name: string): ResolvedProviderConfig | null {
     baseUrl,
     modelsDevProviderId: provider.modelsDevProviderId,
     autoDiscoverCopilotModels: provider.autoDiscoverCopilotModels,
+    excludedModelPrefixes: provider.excludedModelPrefixes,
     apiKey,
     authType,
     authTypeExplicit: provider.authType !== undefined,
