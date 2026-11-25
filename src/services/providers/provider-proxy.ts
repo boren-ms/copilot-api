@@ -64,7 +64,14 @@ export function resolveProviderEndpointUrl(
     && (endpoint === "messages" || endpoint === "chat/completions")
   ) {
     const base = providerConfig.baseUrl.replace(/\/+$/u, "")
-    return `${base.endsWith("/v1") ? base : `${base}/v1`}/${endpoint}`
+    // Copilot exposes Messages under /v1, but Chat Completions at the root.
+    const apiBase =
+      endpoint === "messages" ?
+        base.endsWith("/v1") ?
+          base
+        : `${base}/v1`
+      : base.replace(/\/v1$/u, "")
+    return `${apiBase}/${endpoint}`
   }
   const apiBaseUrl =
     providerConfig.modelsDevProviderId ?
@@ -275,6 +282,10 @@ export async function forwardProviderResponses(
   requestHeaders: Headers,
   options: { clientSignal?: AbortSignal } = {},
 ): Promise<Response> {
+  // Copilot rejects service_tier, including on CLI-authenticated providers.
+  if (providerConfig.modelsDevProviderId === "github-copilot") {
+    delete payload.service_tier
+  }
   consola.log(`<-- model: ${payload.model}`)
   const transportConfig = getUpstreamTransportConfig()
   const headers = buildProviderUpstreamHeaders(providerConfig, requestHeaders)

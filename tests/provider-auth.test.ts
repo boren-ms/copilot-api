@@ -179,26 +179,32 @@ describe("provider endpoint URL", () => {
     )
   })
 
-  test("uses Copilot's versioned Messages and Chat Completions paths", () => {
-    const provider = createProviderConfig({
-      baseUrl: "https://api.githubcopilot.com",
-      modelsDevProviderId: "github-copilot",
-    })
-    expect(resolveProviderEndpointUrl(provider, "messages")).toBe(
-      "https://api.githubcopilot.com/v1/messages",
-    )
-    expect(resolveProviderEndpointUrl(provider, "chat/completions")).toBe(
-      "https://api.githubcopilot.com/v1/chat/completions",
-    )
-    expect(resolveProviderEndpointUrl(provider, "responses")).toBe(
-      "https://api.githubcopilot.com/responses",
-    )
+  test.each([
+    "https://api.githubcopilot.com",
+    "https://api.business.githubcopilot.com",
+    "https://api.enterprise.githubcopilot.com",
+  ])("uses Copilot protocol paths for %s", (baseUrl) => {
+    for (const suffix of ["", "/", "/v1", "/v1/"]) {
+      const provider = createProviderConfig({
+        baseUrl: baseUrl + suffix,
+        modelsDevProviderId: "github-copilot",
+      })
+      expect(resolveProviderEndpointUrl(provider, "messages")).toBe(
+        `${baseUrl}/v1/messages`,
+      )
+      expect(resolveProviderEndpointUrl(provider, "chat/completions")).toBe(
+        `${baseUrl}/chat/completions`,
+      )
+    }
     expect(
       resolveProviderEndpointUrl(
-        { ...provider, baseUrl: "https://api.githubcopilot.com/v1" },
-        "messages",
+        createProviderConfig({
+          baseUrl,
+          modelsDevProviderId: "github-copilot",
+        }),
+        "responses",
       ),
-    ).toBe("https://api.githubcopilot.com/v1/messages")
+    ).toBe(`${baseUrl}/responses`)
   })
 
   test("does not duplicate a catalog URL's final chat endpoint", () => {
