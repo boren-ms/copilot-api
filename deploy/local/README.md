@@ -35,7 +35,7 @@ bun run setup:codex --codex-home "/mnt/c/Users/Your Name/.codex"
 
 # Use a different gateway data directory, address, or model.
 bun run setup:codex --gateway-home "$HOME/.local/share/copilot-api" \
-  --url http://127.0.0.1:4141 --model copilot-cli/gpt-6.1-sol
+  --url http://127.0.0.1:4141 --model gpt-6.1-sol
 ```
 
 `--gateway-home` selects the directory containing `gateway_key`. Choose a model
@@ -46,6 +46,7 @@ The installer:
 
 - Updates the selected `config.toml` in place and names the provider **Copilot
   API**. It preserves unrelated settings and existing reasoning preferences.
+  Existing gateway model choices migrate from `copilot-cli/model` to bare IDs.
 - Enables ChatGPT authentication and sends the gateway key separately through
   `x-api-key`. It removes conflicting provider command/bearer authentication and
   the unsupported top-level `service_tier` setting.

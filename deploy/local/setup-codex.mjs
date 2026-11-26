@@ -7,7 +7,7 @@ import path from "node:path"
 import { isDeepStrictEqual } from "node:util"
 
 const providerId = "copilot-api-community"
-const defaultModel = "copilot-cli/gpt-6.1-sol"
+const defaultModel = "gpt-6.1-sol"
 const defaultUrl = "http://127.0.0.1:4141"
 const beginMarker = "# >>> copilot-api Codex Desktop >>>"
 const endMarker = "# <<< copilot-api Codex Desktop <<<"
@@ -202,7 +202,7 @@ export function mergeCodexConfig(source, options = {}) {
       original.model_provider === providerId
       && typeof original.model === "string"
     ) ?
-      original.model
+      original.model.replace(/^copilot-cli\//u, "")
     : defaultModel)
   if (!model.trim() || /[\r\n]/.test(model))
     throw new Error("Model must be a nonempty single-line identifier")

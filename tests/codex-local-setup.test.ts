@@ -120,7 +120,7 @@ describe("Codex local Remote Control configuration", () => {
   test("separates ChatGPT account authentication from the gateway key", () => {
     const config = parseConfig(mergeCodexConfig(""))
     expect(config.model_provider).toBe("copilot-api-community")
-    expect(config.model).toBe("copilot-cli/gpt-6.1-sol")
+    expect(config.model).toBe("gpt-6.1-sol")
     expect(config.model_providers["copilot-api-community"]).toMatchObject({
       name: "Copilot API",
       base_url: "http://127.0.0.1:4141",
@@ -199,17 +199,27 @@ command = "example-mcp"
     })
   })
 
-  test("preserves the user's model when the gateway is already selected", () => {
+  test("preserves the selected gateway model while removing its legacy prefix", () => {
     const source = `model_provider = "copilot-api-community"
 model = "copilot-cli/selected-model"
 
 [model_providers.copilot-api-community]
 name = "Copilot API"
 `
-    expect(parseConfig(mergeCodexConfig(source)).model).toBe(
-      "copilot-cli/selected-model",
-    )
+    const merged = mergeCodexConfig(source)
+    expect(parseConfig(merged).model).toBe("selected-model")
+    expect(mergeCodexConfig(merged)).toBe(merged)
   })
+
+  test.each(["gpt-6.1-sol", "gemini-4-carbon", "other/custom-model"])(
+    "keeps an existing bare or explicitly namespaced model %s",
+    (model) => {
+      const source = `model_provider = "copilot-api-community"
+model = "${model}"
+`
+      expect(parseConfig(mergeCodexConfig(source)).model).toBe(model)
+    },
+  )
 
   test("migrates existing gateway headers while preserving unrelated headers", () => {
     const source = `[model_providers."copilot-api-community"]

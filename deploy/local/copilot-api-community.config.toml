@@ -1,5 +1,5 @@
 model_provider = "copilot-api-community"
-model = "copilot-cli/gpt-6.1-sol"
+model = "gpt-6.1-sol"
 model_reasoning_effort = "medium"
 web_search = "disabled"
 
