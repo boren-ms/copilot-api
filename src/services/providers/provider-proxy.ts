@@ -107,6 +107,14 @@ export function buildProviderUpstreamHeaders(
     }
   }
 
+  if (
+    providerConfig.name === "copilot-cli"
+    && providerConfig.modelsDevProviderId === "github-copilot"
+  ) {
+    // Use the same integration as CLI model discovery for every endpoint.
+    headers["copilot-integration-id"] = "copilot-developer-cli"
+  }
+
   if (providerConfig.type !== "anthropic") {
     return headers
   }

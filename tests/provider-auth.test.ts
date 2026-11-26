@@ -25,6 +25,34 @@ function createProviderConfig(
 }
 
 describe("buildProviderUpstreamHeaders", () => {
+  test.each(["openai-responses", "openai-compatible", "anthropic"] as const)(
+    "uses the discovery integration for Copilot CLI %s requests",
+    (type) => {
+      const headers = buildProviderUpstreamHeaders(
+        createProviderConfig({
+          name: "copilot-cli",
+          modelsDevProviderId: "github-copilot",
+          authType: "authorization",
+          type,
+        }),
+        new Headers({ "Copilot-Integration-Id": "copilot-4-cli" }),
+      )
+      expect(headers["copilot-integration-id"]).toBe("copilot-developer-cli")
+      expect(headers.authorization).toBe("Bearer provider-key")
+    },
+  )
+
+  test.each([
+    { name: "custom", modelsDevProviderId: "github-copilot" },
+    { name: "copilot-cli", modelsDevProviderId: "other" },
+  ])("keeps the CLI integration scoped to its provider: %j", (overrides) => {
+    const headers = buildProviderUpstreamHeaders(
+      createProviderConfig(overrides),
+      new Headers({ "Copilot-Integration-Id": "copilot-4-cli" }),
+    )
+    expect(headers["copilot-integration-id"]).toBeUndefined()
+  })
+
   test("uses x-api-key auth by default", () => {
     const headers = buildProviderUpstreamHeaders(
       createProviderConfig(),
