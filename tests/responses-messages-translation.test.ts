@@ -60,6 +60,44 @@ const expectCanonicalBase64 = (value: string | undefined) => {
 }
 
 describe("Responses Lite to Messages translation", () => {
+  test("ignores configuration history when translating Gemini Neon requests", () => {
+    const input = [
+      { role: "user" as const, content: "Hello" },
+      { role: "assistant" as const, content: "Hi" },
+      { role: "user" as const, content: "Continue" },
+    ]
+    const payload = {
+      model: "gemini-4-neon",
+      input,
+      reasoning: { effort: "medium" as const },
+    }
+    const options = { model: "gemini-4-neon" }
+    const expected = translateResponsesToMessages(payload, options)
+    const result = translateResponsesToMessages(
+      {
+        ...payload,
+        input: [
+          { type: "configuration_update", reasoning: { effort: "high" } },
+          input[0],
+          input[1],
+          { type: "configuration_update", reasoning: { effort: "low" } },
+          input[2],
+          { type: "configuration_update" },
+        ],
+      },
+      options,
+    )
+
+    expect(result.messagesPayload).toEqual(expected.messagesPayload)
+    expect(result.messagesPayload.output_config).toEqual({ effort: "medium" })
+  })
+
+  test("configuration history alone does not supply a conversation message", () => {
+    expect(() =>
+      translate({ input: [{ type: "configuration_update" }] }),
+    ).toThrow("Responses input must contain at least one translatable message")
+  })
+
   test("includes yielded execution resume guidance in tool call tips", () => {
     expect(MESSAGES_TOOL_CALL_TIPS).toContain(
       "- Yielded execution is not truncated output. Resume a running `cell_id` with `functions.wait` (tool name: `wait`), and a live `session_id` with `tools.write_stdin`, until the command reaches a terminal result.",

@@ -740,6 +740,11 @@ function translateInputItems(
       case "additional_tools": {
         break
       }
+      case "configuration_update": {
+        // Codex replays historical configuration changes alongside messages.
+        // Current settings come from the request, not these history entries.
+        break
+      }
       default: {
         throw new ResponsesMessagesTranslationError(
           `Responses Messages fallback does not support input item type '${type}'`,
