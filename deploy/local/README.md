@@ -133,6 +133,12 @@ updates credentials and model metadata in `COPILOT_API_HOME/config.json`
 (default `~/.local/share/copilot-api/config.json`). It fails explicitly when
 authentication, model discovery, or writing fails, and never prints tokens.
 
+Live Copilot model lists publish bare upstream IDs, such as `gemini-4-carbon`,
+in regular discovery, OpenCode, and the Codex picker. Bare IDs route through
+the live catalog, including models added after startup. Explicit
+`copilot-cli/model` aliases continue to work. Other providers retain their
+namespaced IDs.
+
 The startup hook enables `autoDiscoverCopilotModels` for `copilot-cli`. The
 gateway uses the authenticated Copilot account's model catalog for discovery,
 including the Codex picker. The next list request after five minutes refreshes

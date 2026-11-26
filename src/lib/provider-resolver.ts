@@ -11,6 +11,10 @@ import { state } from "~/lib/state"
 import { setupCodexToken } from "~/lib/token"
 import { getXaiAccessToken } from "~/lib/xai-token"
 import { XAI_API_BASE_URL } from "~/lib/oauth/xai"
+import {
+  getLiveCopilotModels,
+  usesLiveCopilotModels,
+} from "~/services/copilot/cli-models-cache"
 
 const AZURE_OPENAI_SCOPE = "https://cognitiveservices.azure.com/.default"
 
@@ -140,13 +144,27 @@ export async function ensureConfiguredProviderModelAlias(
   return (await resolveConfig(alias.provider)) ? alias : null
 }
 
-/** parseProviderModelAlias + ensureConfiguredProviderModelAlias. */
+/** Resolve configured provider aliases and bare live Copilot model IDs. */
 export async function resolveConfiguredProviderModelAlias(
   model: string,
   resolveConfig: ProviderConfigResolver = resolveProviderConfig,
 ): Promise<ProviderModelAlias | null> {
-  return ensureConfiguredProviderModelAlias(
-    parseProviderModelAlias(model),
-    resolveConfig,
-  )
+  const alias = parseProviderModelAlias(model)
+  if (alias) return ensureConfiguredProviderModelAlias(alias, resolveConfig)
+
+  // Live catalog IDs are public IDs even before startup creates a mapping.
+  if (
+    model.includes("/")
+    || !getRawProviderConfig("copilot-cli")?.autoDiscoverCopilotModels
+  ) {
+    return null
+  }
+  const provider = await resolveConfig("copilot-cli")
+  if (!provider || !usesLiveCopilotModels(provider)) return null
+  const live = await getLiveCopilotModels(provider)
+  const exists =
+    live ?
+      live.some((entry) => entry.id === model)
+    : Object.hasOwn(provider.models ?? {}, model)
+  return exists ? { provider: provider.name, model } : null
 }

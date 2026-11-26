@@ -15,6 +15,7 @@ import path from "node:path"
 import type { ResolvedProviderConfig } from "~/lib/config"
 import { installModelsDevCatalog } from "~/lib/models-dev-cache"
 import { resolveProviderConfigForModel } from "~/lib/provider-config"
+import { resolveConfiguredProviderModelAlias } from "~/lib/provider-resolver"
 import { PATHS } from "~/lib/paths"
 import { defaultConfig, invalidateConfigCache } from "~/lib/config-store"
 import type { ModelsResponse } from "~/lib/types/models"
@@ -3197,6 +3198,10 @@ describe("model routes", () => {
         : id.startsWith("gemini-") ? "openai-compatible"
         : "openai-responses"
       enabledProviders = ["copilot-cli"]
+      providerConfigs["github-copilot"] = {
+        ...createProviderConfig("github-copilot", "https://unused.example"),
+        enabled: false,
+      }
       providerConfigs["copilot-cli"] = {
         ...createProviderConfig(
           "copilot-cli",
@@ -3250,9 +3255,7 @@ describe("model routes", () => {
           const { data } = (await response.json()) as {
             data: Array<{ id: string }>
           }
-          expect(data.map((model) => model.id)).toEqual(
-            expected.map((id) => `copilot-cli/${id}`),
-          )
+          expect(data.map((model) => model.id)).toEqual(expected)
         }
         const scoped = await app.request("/copilot-cli/v1/models")
         expect(scoped.status).toBe(200)
@@ -3263,11 +3266,7 @@ describe("model routes", () => {
         })
         expect(codex.status).toBe(200)
         const catalog = (await codex.json()) as CodexModelsResponse
-        expect(
-          catalog.models
-            .filter((model) => model.slug.startsWith("copilot-cli/"))
-            .map((model) => model.slug),
-        ).toEqual(expected.map((id) => `copilot-cli/${id}`))
+        expect(catalog.models.map((model) => model.slug)).toEqual(expected)
         const opencode = await app.request("/v1/models", {
           headers: { "user-agent": "opencode" },
         })
@@ -3275,13 +3274,29 @@ describe("model routes", () => {
         const openCatalog = (await opencode.json()) as {
           data: Array<{ id: string }>
         }
-        expect(openCatalog.data.map((model) => model.id)).toEqual(
-          expected.map((id) => `copilot-cli/${id}`),
-        )
+        expect(openCatalog.data.map((model) => model.id)).toEqual(expected)
+        expect(
+          (openCatalog.data as Array<OpencodeModel>).find(
+            (model) => model.id === "gemini-4-carbon",
+          )?.modelID,
+        ).toBe("gemini-4-carbon")
       }
       await assertCatalogs(visible)
+      expect(
+        await resolveConfiguredProviderModelAlias("gemini-4-carbon"),
+      ).toEqual({ provider: "copilot-cli", model: "gemini-4-carbon" })
+      expect(
+        await resolveConfiguredProviderModelAlias("unknown-model"),
+      ).toBeNull()
       time += 30_000
       await assertCatalogs([...visible, "gpt-6.2-sol"])
+      expect(await resolveConfiguredProviderModelAlias("gpt-6.2-sol")).toEqual({
+        provider: "copilot-cli",
+        model: "gpt-6.2-sol",
+      })
+      expect(
+        await resolveConfiguredProviderModelAlias("unknown-model"),
+      ).toBeNull()
       expect(fetchMock).toHaveBeenCalledTimes(2)
       time += 5 * 60_000
       await assertCatalogs([...visible, "gpt-6.2-sol", "gemini-4-neon"])
@@ -3297,6 +3312,10 @@ describe("model routes", () => {
     now.mockImplementation(() => time)
     try {
       enabledProviders = ["copilot-cli"]
+      providerConfigs["github-copilot"] = {
+        ...createProviderConfig("github-copilot", "https://unused.example"),
+        enabled: false,
+      }
       const provider: ResolvedProviderConfig = {
         ...createProviderConfig(
           "copilot-cli",
@@ -3372,18 +3391,14 @@ describe("model routes", () => {
         })
         expect(response.status).toBe(200)
         const body = (await response.json()) as CodexModelsResponse
-        return body.models.filter((model) =>
-          model.slug.startsWith("copilot-cli/"),
-        )
+        return body.models
       }
       expect((await request()).map((model) => model.slug)).toEqual([
-        "copilot-cli/gpt-startup-only",
+        "gpt-startup-only",
       ])
       time += 30_000
       const [first, concurrent] = await Promise.all([request(), request()])
-      expect(first.map((model) => model.slug)).toEqual([
-        "copilot-cli/gpt-first",
-      ])
+      expect(first.map((model) => model.slug)).toEqual(["gpt-first"])
       expect(concurrent).toEqual(first)
       expect(await request()).toEqual(first)
       expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -3398,12 +3413,12 @@ describe("model routes", () => {
       time += 5 * 60_000
       const updated = await request()
       expect(updated.map((model) => model.slug)).toEqual([
-        "copilot-cli/gpt-future-sol",
-        "copilot-cli/gpt-chat",
-        "copilot-cli/claude-future",
+        "gpt-future-sol",
+        "gpt-chat",
+        "claude-future",
       ])
       expect(updated[0]).toMatchObject({
-        slug: "copilot-cli/gpt-future-sol",
+        slug: "gpt-future-sol",
         display_name: "GPT Future Sol (copilot-cli)",
         visibility: "list",
         context_window: 800_000,
@@ -3463,9 +3478,9 @@ describe("model routes", () => {
     expect(response.status).toBe(200)
     const body = (await response.json()) as CodexModelsResponse
     const slugs = body.models.map((model) => model.slug)
-    expect(slugs).toContain("copilot-cli/gpt-6.1-sol")
-    expect(slugs).toContain("copilot-cli/gpt-future-sol")
-    expect(slugs).not.toContain("copilot-cli/chat-model-24")
+    expect(slugs).toContain("gpt-6.1-sol")
+    expect(slugs).toContain("gpt-future-sol")
+    expect(slugs).not.toContain("chat-model-24")
   })
 
   test("copies matching Codex catalog models with provider suffixes", async () => {

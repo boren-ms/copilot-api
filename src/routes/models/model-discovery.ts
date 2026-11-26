@@ -156,7 +156,7 @@ function normalizeProviderModel(
     return null
   }
 
-  const id = `${provider}/${rawId}`
+  const id = liveDiscovery ? rawId : `${provider}/${rawId}`
   const ownedBy =
     getStringField(model, "owned_by")
     ?? getStringField(model, "vendor")
@@ -164,6 +164,7 @@ function normalizeProviderModel(
 
   return {
     ...withModelDisplayName(model, provider),
+    ...(liveDiscovery ? { provider } : {}),
     id,
     object: getStringField(model, "object") ?? "model",
     type: getStringField(model, "type") ?? "model",

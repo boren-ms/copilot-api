@@ -198,7 +198,10 @@ function createProviderCodexCandidate(
     ?? getStringField(remoteModel ?? {}, "name")
     ?? modelId
   return {
-    slug: `${providerConfig.name}/${modelId}`,
+    slug:
+      usesLiveCopilotModels(providerConfig) ? modelId : (
+        `${providerConfig.name}/${modelId}`
+      ),
     catalogSlug: modelId,
     usesNativeResponses: effectiveType === "openai-responses",
     providerName: providerConfig.name,

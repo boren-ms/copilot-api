@@ -97,6 +97,92 @@ afterEach(() => {
   }
 })
 
+describe("bare live Copilot model IDs", () => {
+  test("routes newly discovered bare IDs and preserves explicit aliases", () => {
+    const tempDir = createTempDir()
+    writeConfigFile(tempDir, {
+      providers: {
+        "copilot-cli": {
+          type: "openai-responses",
+          baseUrl: "https://copilot-bare.example",
+          apiKey: "test-key",
+          autoDiscoverCopilotModels: true,
+          models: { "gpt-startup-only": {} },
+        },
+      },
+    })
+    const output = runScript(
+      tempDir,
+      `
+      import { resolveConfiguredProviderModelAlias } from "./src/lib/provider-resolver.ts"
+      let calls = 0
+      globalThis.fetch = async () => {
+        calls++
+        return Response.json({
+          data: [{
+            id: "gemini-future",
+            supported_endpoints: ["/chat/completions"],
+          }],
+        })
+      }
+      const bare = await resolveConfiguredProviderModelAlias("gemini-future")
+      const explicit = await resolveConfiguredProviderModelAlias("copilot-cli/gemini-future")
+      const unknown = await resolveConfiguredProviderModelAlias("unknown-model")
+      const removed = await resolveConfiguredProviderModelAlias("gpt-startup-only")
+      const other = await resolveConfiguredProviderModelAlias("missing/model")
+      console.log(JSON.stringify({ bare, explicit, unknown, removed, other, calls }))
+    `,
+    )
+    expect(JSON.parse(output)).toEqual({
+      bare: { provider: "copilot-cli", model: "gemini-future" },
+      explicit: { provider: "copilot-cli", model: "gemini-future" },
+      unknown: null,
+      removed: null,
+      other: null,
+      calls: 1,
+    })
+  })
+
+  test.each([false, true])(
+    "uses the startup snapshot on discovery failure with enabled=%s",
+    (enabled) => {
+      const tempDir = createTempDir()
+      writeConfigFile(tempDir, {
+        providers: {
+          "copilot-cli": {
+            type: "openai-responses",
+            enabled,
+            baseUrl: "https://copilot-bare-fallback.example",
+            apiKey: "test-key",
+            autoDiscoverCopilotModels: true,
+            models: { "gpt-6.1-sol": {} },
+          },
+        },
+      })
+      const output = runScript(
+        tempDir,
+        `
+        import { resolveConfiguredProviderModelAlias } from "./src/lib/provider-resolver.ts"
+        let calls = 0
+        globalThis.fetch = async () => {
+          calls++
+          return new Response(null, { status: 503 })
+        }
+        const known = await resolveConfiguredProviderModelAlias("gpt-6.1-sol")
+        const unknown = await resolveConfiguredProviderModelAlias("unknown-model")
+        console.log(JSON.stringify({ known, unknown, calls }))
+      `,
+      )
+      expect(JSON.parse(output.split("\n").at(-1)!)).toEqual({
+        known:
+          enabled ? { provider: "copilot-cli", model: "gpt-6.1-sol" } : null,
+        unknown: null,
+        calls: enabled ? 1 : 0,
+      })
+    },
+  )
+})
+
 describe("provider resolver", () => {
   test("provider enablement controls all routing independently of Codex catalog visibility", () => {
     const tempDir = createTempDir()

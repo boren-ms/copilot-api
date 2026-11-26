@@ -148,7 +148,11 @@ function toOpencodeModel(
 ): OpencodeModel {
   const separator = model.id.indexOf("/")
   const provider =
-    separator < 0 ? GITHUB_COPILOT_PROVIDER : model.id.slice(0, separator)
+    separator < 0 ?
+      getStringField(model, "provider") === "copilot-cli" ?
+        "copilot-cli"
+      : GITHUB_COPILOT_PROVIDER
+    : model.id.slice(0, separator)
   const rawId =
     separator < 0 ?
       (findEndpointModel(model.id)?.id ?? model.id)
