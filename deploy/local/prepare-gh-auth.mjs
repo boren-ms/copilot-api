@@ -34,6 +34,7 @@ export async function prepareGhAuth(
     Authorization: "Bearer " + token,
     Accept: "application/json",
     "User-Agent": "GitHubCopilotCLI/1.0.100",
+    "Copilot-Integration-Id": "copilot-developer-cli",
   }
   async function getJson(url, label) {
     const response = await fetcher(url, {

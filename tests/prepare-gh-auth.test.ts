@@ -93,6 +93,36 @@ async function expectFailure(run: () => Promise<unknown>, message = "") {
 }
 
 describe("local gh authentication preparation", () => {
+  test("discovers CLI Gemini models and configures their Chat Completions transport", async () => {
+    const geminiIds = [
+      "gemini-4-argon",
+      "gemini-4-carbon",
+      "gemini-4-hydrogen",
+      "gemini-4-neon",
+    ]
+    const f = fixture({
+      catalog: {
+        data: geminiIds.map((id) => ({
+          ...target,
+          id,
+          supported_endpoints: ["/chat/completions"],
+        })),
+      },
+    })
+    await f.run()
+    const catalogRequest = f.requests.find(({ url }) => url === api + "/models")
+    expect(
+      new Headers(catalogRequest?.init?.headers).get("Copilot-Integration-Id"),
+    ).toBe("copilot-developer-cli")
+    const saved = f.read()
+    for (const id of geminiIds) {
+      expect(saved.providers?.["copilot-cli"].models?.[id]?.type).toBe(
+        "openai-compatible",
+      )
+      expect(saved.modelMappings?.[id]).toBe("copilot-cli/" + id)
+    }
+  })
+
   test("preserves gateway keys, unrelated providers and explicit mappings", async () => {
     const f = fixture({
       config: {

@@ -3192,7 +3192,13 @@ describe("model routes", () => {
         "gpt-5.4-nano",
         "gpt-5.6-sol-fast",
       ]
-      const visible = ["claude-opus-5.5", "gemini-4-carbon", "gpt-6.1-sol"]
+      const visible = [
+        "claude-opus-5.5",
+        "gemini-4-carbon",
+        "gemini-4-argon",
+        "gemini-4-hydrogen",
+        "gpt-6.1-sol",
+      ]
       const modelType = (id: string) =>
         id.startsWith("claude-") ? "anthropic"
         : id.startsWith("gemini-") ? "openai-compatible"
@@ -3227,25 +3233,30 @@ describe("model routes", () => {
       fetchMock.mockImplementationOnce(() =>
         Promise.resolve(new Response(null, { status: 503 })),
       )
-      fetchMock.mockImplementationOnce(() =>
-        Promise.resolve(
-          Response.json({
-            data: [...hidden, ...visible, "gpt-6.2-sol"].map(toLiveModel),
-          }),
-        ),
+      const cliCatalog =
+        (ids: Array<string>) => (_url: unknown, init?: RequestInit) => {
+          const isCli =
+            new Headers(init?.headers).get("Copilot-Integration-Id")
+            === "copilot-developer-cli"
+          return Promise.resolve(
+            Response.json({
+              data: ids
+                .filter((id) => isCli || !id.startsWith("gemini-"))
+                .map(toLiveModel),
+            }),
+          )
+        }
+      fetchMock.mockImplementationOnce(
+        cliCatalog([...hidden, ...visible, "gpt-6.2-sol"]),
       )
-      fetchMock.mockImplementationOnce(() =>
-        Promise.resolve(
-          Response.json({
-            data: [
-              ...hidden,
-              ...visible,
-              "gpt-6.2-sol",
-              "gemini-4-neon",
-              "grok-9",
-            ].map(toLiveModel),
-          }),
-        ),
+      fetchMock.mockImplementationOnce(
+        cliCatalog([
+          ...hidden,
+          ...visible,
+          "gpt-6.2-sol",
+          "gemini-4-neon",
+          "grok-9",
+        ]),
       )
       const app = createApp(false)
       const assertCatalogs = async (expected: Array<string>) => {

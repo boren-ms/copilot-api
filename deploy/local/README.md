@@ -143,7 +143,10 @@ namespaced IDs.
 The startup hook enables `autoDiscoverCopilotModels` for `copilot-cli`. The
 gateway uses the authenticated Copilot account's model catalog for discovery,
 including the Codex picker. The next list request after five minutes refreshes
-the catalog, without a gateway restart or a per-model code change. Models are
+the catalog, without a gateway restart or a per-model code change. Discovery
+uses the CLI's `Copilot-Integration-Id: copilot-developer-cli` header
+at startup and during live refresh, so CLI-only models such as Gemini 4 are
+included when available to the account. Models are
 eligible when Copilot advertises an agent endpoint and has not disabled the
 model or tool calls. During temporary failures the gateway uses the last available
 catalog (or the startup snapshot before the first successful refresh).

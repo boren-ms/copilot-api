@@ -101,6 +101,7 @@ async function refresh(entry: CacheEntry): Promise<Catalog | undefined> {
         authorization: `Bearer ${entry.apiKey}`,
         accept: "application/json",
         "user-agent": "GitHubCopilotCLI/1.0.100",
+        "copilot-integration-id": "copilot-developer-cli",
       },
       redirect: "error",
       signal: AbortSignal.timeout(15_000),
