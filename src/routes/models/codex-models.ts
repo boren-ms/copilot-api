@@ -328,6 +328,7 @@ function createCatalogAlias(
   const provider = providerName?.trim()
   const shouldSuffix =
     provider
+    && provider !== "copilot-cli"
     && typeof model.display_name === "string"
     && !model.display_name.endsWith(` (${provider})`)
 

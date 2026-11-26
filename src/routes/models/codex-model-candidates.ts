@@ -205,7 +205,10 @@ function createProviderCodexCandidate(
     catalogSlug: modelId,
     usesNativeResponses: effectiveType === "openai-responses",
     providerName: providerConfig.name,
-    displayName: `${displayName} (${providerConfig.name})`,
+    displayName:
+      providerConfig.name === "copilot-cli" ?
+        displayName
+      : `${displayName} (${providerConfig.name})`,
     description: displayName,
     contextWindow: metadata.contextWindow ?? 256_000,
     maxOutputTokens: metadata.maxOutputTokens ?? 32_000,

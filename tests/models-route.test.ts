@@ -3430,7 +3430,7 @@ describe("model routes", () => {
       ])
       expect(updated[0]).toMatchObject({
         slug: "gpt-future-sol",
-        display_name: "GPT Future Sol (copilot-cli)",
+        display_name: "GPT Future Sol",
         visibility: "list",
         context_window: 800_000,
         max_output_tokens: 100_000,
@@ -3492,6 +3492,9 @@ describe("model routes", () => {
     expect(slugs).toContain("gpt-6.1-sol")
     expect(slugs).toContain("gpt-future-sol")
     expect(slugs).not.toContain("chat-model-24")
+    expect(
+      body.models.find((model) => model.slug === "gpt-6.1-sol")?.display_name,
+    ).toBe("GPT-6.1-Sol")
   })
 
   test("copies matching Codex catalog models with provider suffixes", async () => {
