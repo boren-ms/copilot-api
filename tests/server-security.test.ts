@@ -118,4 +118,33 @@ describe("network-exposed server policy", () => {
 
     expect(response.headers.get("access-control-allow-origin")).toBe("*")
   })
+
+  test("allows unauthenticated /models and usage routes on loopback but requires auth when network-exposed", async () => {
+    const loopbackApp = createServer({ getApiKeys: () => ["secret-key"] })
+    for (const path of [
+      "/models",
+      "/v1/models",
+      "/usage",
+      "/token-usage",
+      "/token-usage/daily",
+      "/token-usage/events",
+      "/token-usage/sessions",
+    ]) {
+      const loopbackResponse = await loopbackApp.request(
+        `http://127.0.0.1${path}`,
+      )
+      expect(loopbackResponse.status).not.toBe(401)
+    }
+
+    const exposedApp = createServer({
+      networkExposed: true,
+      getApiKeys: () => ["secret-key"],
+    })
+    for (const path of ["/models", "/usage", "/token-usage"]) {
+      const exposedResponse = await exposedApp.request(
+        `http://gateway.example.com${path}`,
+      )
+      expect(exposedResponse.status).toBe(401)
+    }
+  })
 })

@@ -57,7 +57,21 @@ export function createServer(options: CreateServerOptions = {}): Hono {
     "*",
     createAuthMiddleware({
       getApiKeys: options.getApiKeys,
-      allowUnauthenticatedPaths: ["/", "/usage-viewer", "/usage-viewer/"],
+      allowUnauthenticatedPaths:
+        networkExposed ?
+          ["/", "/usage-viewer", "/usage-viewer/"]
+        : [
+            "/",
+            "/usage-viewer",
+            "/usage-viewer/",
+            "/models",
+            "/v1/models",
+            "/usage",
+            "/token-usage",
+            "/token-usage/daily",
+            "/token-usage/events",
+            "/token-usage/sessions",
+          ],
       shouldSkipPath: (path) => path.startsWith("/admin/"),
       allowWhenNoApiKeys: !networkExposed,
     }),
