@@ -138,6 +138,14 @@ export async function prepareGhAuth(
           if (supports.reasoning_effort.includes("medium")) {
             entry.defaultReasoningEffort = "medium"
           }
+        } else if (
+          entry.type === "anthropic"
+          && typeof supports?.max_thinking_budget === "number"
+          && supports.adaptive_thinking !== true
+        ) {
+          // Budget-based thinking does not accept the Messages effort field.
+          entry.reasoningEfforts = ["none"]
+          entry.defaultReasoningEffort = "none"
         }
         return [model.id, entry]
       }),

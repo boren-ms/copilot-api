@@ -282,9 +282,14 @@ export async function forwardProviderResponses(
   requestHeaders: Headers,
   options: { clientSignal?: AbortSignal } = {},
 ): Promise<Response> {
-  // Copilot rejects service_tier, including on CLI-authenticated providers.
   if (providerConfig.modelsDevProviderId === "github-copilot") {
     delete payload.service_tier
+    if (
+      /^gpt-5\.3-codex(?:-\d{4}-\d{2}-\d{2})?$/.test(payload.model)
+      && payload.reasoning?.context === "all_turns"
+    ) {
+      payload.reasoning.context = "auto"
+    }
   }
   consola.log(`<-- model: ${payload.model}`)
   const transportConfig = getUpstreamTransportConfig()

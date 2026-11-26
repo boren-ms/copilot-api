@@ -123,6 +123,26 @@ describe("local gh authentication preparation", () => {
     }
   })
 
+  test("disables fixed effort for legacy Anthropic thinking", async () => {
+    const haiku = {
+      id: "claude-haiku-4.5",
+      supported_endpoints: ["/v1/messages"],
+      capabilities: {
+        supports: { max_thinking_budget: 32000, tool_calls: true },
+      },
+    }
+    const f = fixture({ catalog: { data: [target, haiku] } })
+    await f.run()
+    const models = f.read().providers?.["copilot-cli"].models
+    expect(models?.[haiku.id]?.reasoningEfforts).toEqual(["none"])
+    expect(models?.[haiku.id]?.defaultReasoningEffort).toBe("none")
+    expect(models?.[target.id]?.reasoningEfforts).toEqual([
+      "low",
+      "medium",
+      "max",
+    ])
+  })
+
   test("preserves gateway keys, unrelated providers and explicit mappings", async () => {
     const f = fixture({
       config: {

@@ -20,6 +20,50 @@ test("preserves service_tier for other Responses providers", async () => {
   await checkForwardedTier("openai", "priority", "priority")
 })
 
+for (const [modelsDevProviderId, model, context, expectedContext] of [
+  ["github-copilot", "gpt-5.3-codex", "all_turns", "auto"],
+  ["github-copilot", "gpt-5.3-codex-2026-02-24", "all_turns", "auto"],
+  ["github-copilot", "gpt-5.3-codex", "current_turn", "current_turn"],
+  ["github-copilot", "gpt-6.1-sol", "all_turns", "all_turns"],
+  ["openai", "gpt-5.3-codex", "all_turns", "all_turns"],
+] as const) {
+  test(`forwards reasoning context for ${modelsDevProviderId} ${model} with ${context}`, async () => {
+    const provider: ResolvedProviderConfig = {
+      apiKey: "test-key",
+      authType: "authorization",
+      baseUrl: "https://provider.example",
+      modelsDevProviderId,
+      name: "custom-provider",
+      type: "openai-responses",
+    }
+    const fetchMock = mock((_url: unknown, _init?: RequestInit) =>
+      Promise.resolve(Response.json({ ok: true })),
+    )
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+    const payload: ResponsesPayload = {
+      input: "hello",
+      model,
+      reasoning: { context, effort: "medium" },
+    }
+    const response = await forwardProviderResponses(
+      provider,
+      payload,
+      new Headers(),
+    )
+    await response.text()
+
+    const [, init] = fetchMock.mock.calls[0]
+    if (typeof init?.body !== "string") {
+      throw new Error("Expected a JSON string request body")
+    }
+    const body = JSON.parse(init.body) as Pick<ResponsesPayload, "reasoning">
+    expect(body.reasoning).toEqual({
+      context: expectedContext,
+      effort: "medium",
+    })
+  })
+}
+
 async function checkForwardedTier(
   modelsDevProviderId: string,
   serviceTier: ResponsesPayload["service_tier"],
